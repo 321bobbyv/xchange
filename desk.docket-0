@@ -1,0 +1,10 @@
+:~
+  title+'xchange'
+  info+'p2p marketplace'
+  color+0xff.ffff
+  version+[0 0 1]
+  website+'~'
+  license+'MIT'
+  image+'/apps/xchange/img/xchange-logo.png'
+  site+/apps/xchange
+==
