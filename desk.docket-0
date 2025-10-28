@@ -1,9 +1,9 @@
 :~
-  title+'xchange'
-  info+'p2p marketplace'
+  title+''
+  info+'P2P Marketplace and Townsquare'
   color+0xff.ffff
   version+[0 0 1]
-  website+'~'
+  website+'https://github.com/321bobbyv/xchange-classifieds'
   license+'MIT'
   image+'/apps/xchange/img/xchange-logo.png'
   site+/apps/xchange

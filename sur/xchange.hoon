@@ -52,7 +52,7 @@
   +$  image-info1
   $:  filename1=@t
       content-type1=@t
-      body1=octs::[legnth in bytes and data]
+      body1=octs::[legnth in bytes and data]How do you send the file sizes of both images to the urbit via the form
   ==
   +$  image-info2
   $:  filename2=@t
