@@ -181,6 +181,7 @@
           [cards this(state state(message-myads ''))]
           ::posting new add on post ad webpage
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'POST'))
+          ~>  %bout
           =/  new-state  (post-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
           =/  myinactive-listings  (get-inactive-listings mylistings1.new-state)
@@ -209,6 +210,7 @@
           [(get-view-alert req purl-pair now.bowl our.bowl eny alerts.state alert-results listings1.state) this]  
           :: update current ad
         ?:  &(?=([%xchange %manage-myad *] +.q.purl) =(method.request.q.req %'POST'))
+          ~>  %bout
           =/  new-state  (post-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
           =/  myinactive-listings  (get-inactive-listings mylistings1.new-state)
@@ -1228,38 +1230,11 @@
               ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
               ;meta(charset "utf-8");
               ;meta(name "viewport", content "width=device-width, initial-scale=1");
-              ;style: {style}
-                ;script
-                ; document.addEventListener('DOMContentLoaded', function() {{
-                ;   const maxSize = 2 * 1024 * 1024;
-                ;   const fileInputs = document.querySelectorAll('.file-input');
-                ;   
-                ;   fileInputs.forEach(function(input) {{
-                ;     input.addEventListener('change', function(e) {{
-                ;       const file = e.target.files[0];
-                ;       if (file && file.size > maxSize) {{
-                ;         alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
-                ;               (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                ;         e.target.value = '';
-                ;       }}
-                ;     }});
-                ;   }});
-                ;   
-                ;   document.querySelector('form[action="/apps/xchange/postad"]').addEventListener('submit', function(e) {{
-                ;     for (let input of fileInputs) {{
-                ;       const file = input.files[0];
-                ;       if (file && file.size > maxSize) {{
-                ;         e.preventDefault();
-                ;         alert('Please remove files larger than 2MB before submitting');
-                ;         return false;
-                ;       }}
-                ;     }}
-                ;   }});
-                ; }});
-              ==
+              ;script: {script} 
+              ;style: {style}              
             ==::closes head
               ;body
-      ;div(class "header-wrapper")
+              ;div(class "header-wrapper")
               ;img(src "/apps/xchange/img/xchange-logo.png", alt "Xchange Logo", class "header-logo");
               ;div.search-bar
                   ;form(method "get", action "/apps/xchange/search", class "search-form")
@@ -1389,14 +1364,20 @@
                   ==
                 ==
                 ;tr
-                  ;td: Post Images
-                  ;td
-                    ;div(style "display: flex; gap: 12px")
-                      ;input(type "file", name "image1", class "file-input");
-                      ;input(type "file", name "image2", class "file-input");
+                ;td: Post Images
+                ;td
+                  ;div(style "display: flex; flex-direction: column; gap: 8px;")
+                    ;div(style "display: flex; gap: 12px; align-items: center;")
+                      ;input(type "hidden", name "image1-size", id "image1-size");
+                      ;input(type "file", name "image1", class "file-input", id "image1");                      
+                    ==
+                    ;div(style "display: flex; gap: 12px; align-items: center;")
+                      ;input(type "hidden", name "image2-size", id "image2-size");
+                      ;input(type "file", name "image2", class "file-input", id "image2");
                     ==
                   ==
                 ==
+              ==
                 ;tr
                   ;td(colspan "2", style "text-align: center;")
                     ;button(type "submit", class "submit-button"): post an ad
@@ -1520,35 +1501,8 @@
                 ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
                 ;meta(charset "utf-8");
                 ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ;script: {script} 
                 ;style: {style}
-                ;script
-                    ; document.addEventListener('DOMContentLoaded', function() {{
-                    ;   const maxSize = 2 * 1024 * 1024;
-                    ;   const fileInputs = document.querySelectorAll('.file-input');
-                    ;   
-                    ;   fileInputs.forEach(function(input) {{
-                    ;     input.addEventListener('change', function(e) {{
-                    ;       const file = e.target.files[0];
-                    ;       if (file && file.size > maxSize) {{
-                    ;         alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
-                    ;               (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                    ;         e.target.value = '';
-                    ;       }}
-                    ;     }});
-                    ;   }});
-                    ;   
-                    ;   document.querySelector('form[action="/apps/xchange/postad"]').addEventListener('submit', function(e) {{
-                    ;     for (let input of fileInputs) {{
-                    ;       const file = input.files[0];
-                    ;       if (file && file.size > maxSize) {{
-                    ;         e.preventDefault();
-                    ;         alert('Please remove files larger than 2MB before submitting');
-                    ;         return false;
-                    ;       }}
-                    ;     }}
-                    ;   }});
-                    ; }});
-                  ==
               ==:: closes head
               ;body
                 ;div(class "header-wrapper")
@@ -2102,14 +2056,16 @@
             [%give %kick [/http-response/[p.req]]~ ~]
           ==
     ::
+    ::
     ++  post-myad-state
         |=  [req=(pair @ta inbound-request:eyre) now=@da our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) listings=(map id=@t advert) listings1=(map id=@t advert1) alerts=(map alert-id=@t alert) alert-results=(map ad-id=@t alert-result) message-myads=@t maxpic-size=@ud]
         ^+  state
         =/  data=octs  +.body.request.q.req
-        ::=/  preview  `@t`(cut 3 [0 2.200] (swp 3 q.data))::  last 2200 bytes
-        ::=/  preview  `@t`(cut 3 [0 1.200] q.data):: first 1200 bytes
-        ::~&  [%preview preview]
-        :: Simple string search function
+        ::=/  preview-end  `@t`(cut 3 [0 2.200] (swp 3 q.data))::  last 2200 bytes
+        =/  preview  `@t`(cut 3 [0 1.200] q.data):: first 1200 bytes
+        ~&  [%preview preview]
+        ::~&  [%preview-end preview-end]
+        :: Simple string search function for everything beside image 1 and image2
         =/  find-field
         |=  [field-name=@t data=@]  :: Changed data=@t to data=@
         ^-  @t
@@ -2177,19 +2133,25 @@
                 %+  can  3
                 :~  [6 `@`'name="']
                     [(met 3 field-name-binary) field-name-binary]
+                    [1 `@`'"']  
                 ==
           =/  pattern-len  (met 3 search-pattern)
           =/  data-len  (met 3 data)
           =/  i  0
           |-
-          ?:  (gte (add i pattern-len) data-len)  ''  :: Not found
+          ?:  (gte (add i pattern-len) data-len)  
+            ::~&  [%field-not-found field-name]
+            ''  :: Not found
           =/  slice  (cut 3 [i pattern-len] data)
           ?:  =(slice search-pattern)
-            :: Found the field, now look for filename= on the same line
-            =/  line-start  i
+            ::~&  [%found-name-field field-name at-position=i]
+            :: Found the field, now look for filename= within the next 200 characters
             =/  j  (add i pattern-len)
+            =/  search-limit  (min (add j 200) data-len)  :: Search up to 200 chars ahead
             |-
-            ?:  (gte (add j 10) data-len)  ''  :: filename= not found
+            ?:  (gte (add j 10) search-limit)  
+              ~&  [%filename-not-found-for field-name]
+              ''  :: filename= not found
             =/  check  (cut 3 [j 10] data)
             ?:  =(check `@`'filename="')
               :: Found filename=", extract until closing quote
@@ -2199,10 +2161,11 @@
               ?:  (gte k data-len)  ''
               =/  char  (cut 3 [k 1] data)
               ?:  =(char `@`'"')
-                `@t`(cut 3 [filename-start (sub k filename-start)] data)
+                =/  result  `@t`(cut 3 [filename-start (sub k filename-start)] data)
+                ::~&  [%extracted-filename field-name result at-position=filename-start]
+                result
               $(k +(k))
-            =/  char  (cut 3 [j 1] data)
-            ?:  =(char `@`'\0d')  ''  :: End of line, filename not found
+            :: Don't stop at \0d, keep searching
             $(j +(j))
           $(i +(i))
         =/  find-content-type
@@ -2294,6 +2257,127 @@
               $(j +(j))
             $(i +(i))
         ::
+        :: Optimized filename that uses known file sizes to jump to the right position
+        =/  find-filename-optimized
+          |=  [field-name=@t data=@ start-pos=@ud]
+          ^-  @t
+          =/  field-name-binary  `@`field-name 
+          =/  search-pattern  
+                %+  can  3
+                :~  [6 `@`'name="']
+                    [(met 3 field-name-binary) field-name-binary]
+                    [1 `@`'"']  
+                ==
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  i  start-pos  :: Start searching from given position
+          |-
+          ?:  (gte (add i pattern-len) data-len)  ''  :: Not found
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the field, now look for filename= within the next 200 characters
+            =/  j  (add i pattern-len)
+            =/  search-limit  (min (add j 200) data-len)
+            |-
+            ?:  (gte (add j 10) search-limit)  ''  :: filename= not found
+            =/  check  (cut 3 [j 10] data)
+            ?:  =(check `@`'filename="')
+              :: Found filename=", extract until closing quote
+              =/  filename-start  (add j 10)
+              =/  k  filename-start
+              |-
+              ?:  (gte k data-len)  ''
+              =/  char  (cut 3 [k 1] data)
+              ?:  =(char `@`'"')
+                `@t`(cut 3 [filename-start (sub k filename-start)] data)
+              $(k +(k))
+            $(j +(j))
+          $(i +(i))
+        :: Optimized file extraction that uses known file sizes to jump to the right position
+        =/  find-file-content-optimized
+          |=  [field-name=@t data=@ start-pos=@ud]
+          ^-  [file-data=@ file-size=@ud]          
+          =/  field-name-binary  `@`field-name
+          =/  search-pattern  
+            %+  can  3
+            :~  [6 `@`'name="']
+                [(met 3 field-name-binary) field-name-binary]
+                [1 `@`'"']
+            == 
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  double-crlf  `@`'\0d\0a\0d\0a'
+          =/  i  start-pos  :: Start searching from given position
+          
+          :: Find the field
+          |-
+          ?:  (gte (add i pattern-len) data-len)  [0 0]
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the field, now find the double CRLF
+            =/  j  (add i pattern-len)
+            |-
+            ?:  (gte (add j 4) data-len)  [0 0]
+            =/  check  (cut 3 [j 4] data)
+            ?:  =(check double-crlf)
+              :: Found file content start
+              =/  content-start  (add j 4)
+              :: Now find the end
+              =/  k  content-start
+              |-
+              ?:  (gte (add k 8) data-len)  
+                =/  final-end  (sub data-len 2)
+                =/  file-content  (cut 3 [content-start (sub final-end content-start)] data)
+                [file-content `@ud`(sub final-end content-start)]
+              =/  boundary-pattern  `@`'\0d\0a------'
+              =/  boundary-check  (cut 3 [k 8] data)
+              ?:  =(boundary-check boundary-pattern)
+                =/  file-content  (cut 3 [content-start (sub k content-start)] data)
+                [file-content `@ud`(sub k content-start)]
+              $(k +(k))
+            $(j +(j))
+          $(i +(i))
+          ::
+          =/  find-content-type-optimized
+              |=  [field-name=@t data=@ start-pos=@ud]
+              ^-  @t
+              =/  field-name-binary  `@`field-name 
+              =/  search-pattern  
+                  %+  can  3
+                  :~  [6 `@`'name="']
+                      [(met 3 field-name-binary) field-name-binary]
+                      [1 `@`'"']
+                  ==
+              =/  pattern-len  (met 3 search-pattern)
+              =/  data-len  (met 3 data)
+              =/  i  start-pos  :: Start searching from given position
+              |-
+              ?:  (gte (add i pattern-len) data-len)  ''
+              =/  slice  (cut 3 [i pattern-len] data)
+              ?:  =(slice search-pattern)
+                =/  j  (add i pattern-len)
+                =/  section-end
+                  =/  k  j
+                  |-
+                  ?:  (gte (add k 6) data-len)  data-len
+                  =/  boundary-check  (cut 3 [k 6] data)
+                  ?:  =(boundary-check `@`'------')  k
+                  $(k +(k))
+                |-
+                ?:  (gte (add j 14) section-end)  ''
+                =/  check  (cut 3 [j 14] data)
+                ?:  =(check `@`'Content-Type: ')
+                  =/  value-start  (add j 14)
+                  =/  m  value-start
+                  |-
+                  ?:  (gte (add m 2) section-end)  
+                    `@t`(cut 3 [value-start (sub section-end value-start)] data)
+                  =/  check-end  (cut 3 [m 2] data)
+                  ?:  =(check-end `@`'\0d\0a')
+                    `@t`(cut 3 [value-start (sub m value-start)] data)
+                  $(m +(m))
+                $(j +(j))
+              $(i +(i))
         :: Function to check if filename has valid image extension
         =/  is-valid-image-extension
           |=  filename=@t
@@ -2327,21 +2411,29 @@
         =/  addescription  (find-textarea-field 'description' +.data)
         =/  adstatus  ?:  =((find-field 'active' +.data) '%.y')  %.y  %.n
         =/  max-file-size  `@ud`(mul maxpic-size (mul 1.024 1.024))  :: limit (maxpic-size * 1024 * 1024 bytes)
-        =/  binary-data  +.data 
-        =/  adfilename1  (find-filename image1-field-name +.data)
-        =/  adfilename2  (find-filename image2-field-name +.data)
-        :: Check file extensions
-          ?:  !(is-valid-image-extension adfilename1)
-            =/  error-body  'Error: Image 1 must be a PNG or JPG file'
-            state(message-myads error-body)
-          ?:  !(is-valid-image-extension adfilename2)
-            =/  error-body  'Error: Image 2 must be a PNG or JPG file'
-            state(message-myads error-body)
-        =/  adcontenttype1  (find-content-type image1-field-name +.data)
-        =/  adcontenttype2  (find-content-type image2-field-name +.data)
-        =/  [adfile1=@ adfile1-size=@ud]  (find-file-content-with-size image1-field-name binary-data)
-        =/  [adfile2=@ adfile2-size=@ud]  (find-file-content-with-size image2-field-name binary-data)
-        ?:  (gth adfile1-size max-file-size)
+        =/  binary-data  +.data
+        =/  adfilename1  (find-filename image1-field-name +.data)  
+        =/  adfile1-size-text  (find-field 'image1-size' +.data)
+        :: Convert text to @ud safely
+        =/  adfile1-size-from-form=@ud
+          ?:  |(=(adfile1-size-text '') =(adfilename1 ''))
+            ::~&  [%skipping-file1-no-file]
+            0
+          ::~&  [%parsing-file1-size adfile1-size-text]
+          =/  parsed  (scan (trip adfile1-size-text) dim:ag)
+          ::~&  [%parsed-result-file1 parsed]
+          ?~  parsed  
+            ::~&  [%parse-failed-file1]
+            0
+          parsed
+        =/  image2-start-estimate  
+            ?:  =(adfile1-size-from-form 0)  
+              0  :: If no image1, start from beginning
+            :: Find where image1 field starts, add size + reasonable header buffer
+            (add 800 adfile1-size-from-form)  :: 900 bytes covers all fields before image1 + headers
+          ::
+                  ::=/  adfilename2  (find-filename image2-field-name +.data)
+        ?:  (gth adfile1-size-from-form max-file-size)
           :: Handle file1 too large error - return error response
           =/  error-body  
                 %-  crip
@@ -2349,22 +2441,68 @@
                 %+  weld  (trip (scot %ud maxpic-size))
                 " MB max picture size limit"
           state(message-myads error-body)
-        ?:  (gth adfile2-size max-file-size)
-          :: Handle file1 too large error - return error response
+        
+        =/  [adfile1=@ adfile1-size=@ud]  
+            (find-file-content-optimized image1-field-name binary-data 0)
+        =/  adcontenttype1  (find-content-type-optimized image1-field-name +.data 0)
+        =/  adfilename2  (find-filename-optimized image2-field-name +.data image2-start-estimate)
+        =/  adfile2-size-text  (find-field 'image2-size' +.data)
+        ::~&  [%file-sizes-text adfile1-size-text adfile2-size-text]   
+        =/  adfile2-size-from-form=@ud
+          ?:  |(=(adfile2-size-text '') =(adfilename2 ''))
+            ::~&  [%skipping-file2-no-file]
+            0
+          ::~&  [%parsing-file2-size adfile2-size-text]
+          =/  parsed  (scan (trip adfile2-size-text) dim:ag)
+          ::~&  [%parsed-result-file2 parsed]
+          ?~  parsed  
+            ::~&  [%parse-failed-file2]
+            0
+          parsed
+::
+        ?:  (gth adfile2-size-from-form max-file-size)
+          :: Handle file2 too large error - return error response
           =/  error-body  
               %-  crip
               %+  weld  "Error: Image 2 file size exceeds "
               %+  weld  (trip (scot %ud maxpic-size))
         " MB max picture size limit"
           state(message-myads error-body)
+
+        =/  [adfile2=@ adfile2-size=@ud]  
+          (find-file-content-optimized image2-field-name binary-data image2-start-estimate)    
+        :: Check file extensions
+          ?:  !(is-valid-image-extension adfilename1)
+            =/  error-body  'Error: Image 1 must be a PNG or JPG file'
+            state(message-myads error-body)
+          ?:  !(is-valid-image-extension adfilename2)
+            =/  error-body  'Error: Image 2 must be a PNG or JPG file'
+            state(message-myads error-body)
+        ::=/  adcontenttype1  (find-content-type image1-field-name +.data)
+        ::=/  adcontenttype2  (find-content-type image2-field-name +.data)
+        ::=/  [adfile1=@ adfile1-size=@ud]  (find-file-content-with-size image1-field-name binary-data)
+        ::=/  [adfile2=@ adfile2-size=@ud]  (find-file-content-with-size image2-field-name binary-data)
+        =/  adcontenttype2  (find-content-type-optimized image2-field-name +.data image2-start-estimate)
+        ::~&  [%file-sizes-parsed adfile1-size-from-form adfile2-size-from-form]          
+        ::~&  [%image-filenames adfilename1 adfilename2]
+        ::~&  [%comparing-files-1 calc-size=adfile1-size text-size=adfile1-size-from-form match==(adfile1-size adfile1-size-from-form)]
+        ::~&  [%comparing-files-2 calc-size=adfile2-size text-size=adfile2-size-from-form match==(adfile2-size adfile2-size-from-form)]
+        =/  delete-image1  =((find-field 'delete-image1' +.data) 'true')
+        =/  delete-image2  =((find-field 'delete-image2' +.data) 'true')
+
+        
         =/  image1-info
-          ?:  =(adfilename1 '')
-            ?~  existing-ad  ~  image1.u.existing-ad  
-          `[adfilename1 adcontenttype1 [adfile1-size adfile1]]
+            ?:  delete-image1  
+              ~  :: Explicitly delete
+            ?:  =(adfilename1 '')
+              ?~  existing-ad  ~  image1.u.existing-ad  :: Keep existing if no new upload
+            `[adfilename1 adcontenttype1 [adfile1-size adfile1]]  :: New upload or replacement
         =/  image2-info
-          ?:  =(adfilename2 '')
-            ?~  existing-ad  ~  image2.u.existing-ad  
-          `[adfilename2 adcontenttype2 [adfile2-size adfile2]]
+            ?:  delete-image2  
+              ~  :: Explicitly delete
+            ?:  =(adfilename2 '')
+              ?~  existing-ad  ~  image2.u.existing-ad  :: Keep existing if no new upload
+            `[adfilename2 adcontenttype2 [adfile2-size adfile2]]  :: New upload or replacement
         =/  new-advert  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus]
         =/  new-advert1  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus image1-info image2-info]
         =/  newlistings  ?:  =(%.y adstatus)
@@ -2379,6 +2517,7 @@
         =/  success-message  'Ad Added Successfully'
         state(mylistings newmylistings, listings newlistings, mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
                     ::
+    ::
     ::
     ++  update-myalert-state
       |=  [req=(pair @ta inbound-request:eyre) now=@da our=@p eny=@t alerts=(map id=@t alert) listings=(map id=@t advert) listings1=(map id=@t advert1) alert-results=(map ad-id=@t alert-result)]
@@ -4043,6 +4182,62 @@
                     [%give %kick [/http-response/[p.req]]~ ~]   
                 ==
         ::
+    ++  script
+        ^~
+        %-  trip
+        '''
+          document.addEventListener('DOMContentLoaded', function() {
+            const maxSize = 2 * 1024 * 1024;
+            const fileInputs = document.querySelectorAll('.file-input');
+            
+            fileInputs.forEach(function(input) {
+              input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                  // Update the corresponding hidden size field
+                  const sizeInput = document.getElementById(e.target.id + '-size');
+                  if (sizeInput) {
+                    sizeInput.value = file.size;
+                  } 
+                  if (file.size > maxSize) {
+                    alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
+                          (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                    e.target.value = '';
+                    if (sizeInput) sizeInput.value = '';
+                  }
+                }
+              });
+            });
+            
+            // Handle manage page file inputs (add-image and replace-image)
+            const manageInputs = document.querySelectorAll('input[name^="add-image"], input[name^="replace-image"]');
+            manageInputs.forEach(function(input) {
+              input.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file && file.size > maxSize) {
+                  alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
+                        (file.size / 1024 / 1024).toFixed(2) + 'MB');
+                  e.target.value = '';
+                }
+              });
+            });
+            
+            // Submit validation for postad form
+            const postAdForm = document.querySelector('form[action="/apps/xchange/postad"]');
+            if (postAdForm) {
+              postAdForm.addEventListener('submit', function(e) {
+                for (let input of fileInputs) {
+                  const file = input.files[0];
+                  if (file && file.size > maxSize) {
+                    e.preventDefault();
+                    alert('Please remove files larger than 2MB before submitting');
+                    return false;
+                  }
+                }
+              });
+            }
+          });
+        '''
     ++  style
             ^~
             %-  trip
@@ -5330,7 +5525,6 @@
                 font-size: 1rem;
                 padding: 15px;
               }
-            }
             '''
             ::
             ::
