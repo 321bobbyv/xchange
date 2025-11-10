@@ -169,6 +169,7 @@
           [cards this(state new-state)]
           ::deleting ad button
         ?:  &(=(url.request.q.req '/apps/xchange/delete-myad') =(method.request.q.req %'POST'))
+            ~>  %bout
             =/  new-state  (delete-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state)
             =/  myad-id  (get-myad-id-from-request req)  :: Helper function to extract ID
             =/  web-cards  (delete-myad-webpage req our.bowl eny mylistings.state)
@@ -181,6 +182,7 @@
           [cards this(state state(message-myads ''))]
           ::posting new add on post ad webpage
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'POST'))
+          ::~&  %post-ad
           ~>  %bout
           =/  new-state  (post-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
@@ -211,7 +213,7 @@
           :: update current ad
         ?:  &(?=([%xchange %manage-myad *] +.q.purl) =(method.request.q.req %'POST'))
           ~>  %bout
-          =/  new-state  (post-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
+          =/  new-state  (post-myad-state-update req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
           =/  myinactive-listings  (get-inactive-listings mylistings1.new-state)
           ::~&  [%active-count ~(wyt by myactive-listings)]
@@ -1230,7 +1232,9 @@
               ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
               ;meta(charset "utf-8");
               ;meta(name "viewport", content "width=device-width, initial-scale=1");
-              ;script: {script} 
+              ;script(src "https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js");
+              ;script(src "https://cdn.jsdelivr.net/npm/image-blob-reduce@4.1.0/dist/image-blob-reduce.min.js");
+              ;script: {script}
               ;style: {style}              
             ==::closes head
               ;body
@@ -1364,20 +1368,20 @@
                   ==
                 ==
                 ;tr
-                ;td: Post Images
-                ;td
-                  ;div(style "display: flex; flex-direction: column; gap: 8px;")
-                    ;div(style "display: flex; gap: 12px; align-items: center;")
-                      ;input(type "hidden", name "image1-size", id "image1-size");
-                      ;input(type "file", name "image1", class "file-input", id "image1");                      
-                    ==
-                    ;div(style "display: flex; gap: 12px; align-items: center;")
-                      ;input(type "hidden", name "image2-size", id "image2-size");
-                      ;input(type "file", name "image2", class "file-input", id "image2");
+                  ;td: Post Images
+                  ;td
+                    ;div(style "display: flex; flex-direction: column; gap: 8px;")
+                      ;div(style "display: flex; gap: 12px; align-items: center;")
+                        ;input(type "hidden", name "image1-size", id "image1-size");
+                        ;input(type "file", name "image1", class "file-input", id "image1");                      
+                      ==
+                      ;div(style "display: flex; gap: 12px; align-items: center;")
+                        ;input(type "hidden", name "image2-size", id "image2-size");
+                        ;input(type "file", name "image2", class "file-input", id "image2");
+                      ==
                     ==
                   ==
                 ==
-              ==
                 ;tr
                   ;td(colspan "2", style "text-align: center;")
                     ;button(type "submit", class "submit-button"): post an ad
@@ -1501,6 +1505,8 @@
                 ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
                 ;meta(charset "utf-8");
                 ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ;script(src "https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js");
+                ;script(src "https://cdn.jsdelivr.net/npm/image-blob-reduce@4.1.0/dist/image-blob-reduce.min.js");
                 ;script: {script} 
                 ;style: {style}
               ==:: closes head
@@ -1566,7 +1572,7 @@
                   ==
               ==::closes left-bar
                 ;div.table-div-ads
-                ;form(method "post", action "/apps/xchange/manage-myad", enctype "multipart/form-data")
+                ;form(method "post", action "/apps/xchange/manage-myad", enctype "multipart/form-data", onsubmit "this.style.cursor='wait'; this.querySelector('.submit-button').disabled=true; this.querySelector('.submit-button').textContent='Adding Ad...'; document.body.style.cursor='wait';")
                   ;table.myad-form-table
                     ;tr
                       ;div.myad-input-cell
@@ -1661,28 +1667,33 @@
                               ;div(style "margin-bottom: 10px;")
                                 ;p: "No Image 1 uploaded"
                                 ;label: "Add Image 1:"
-                                ;input(type "file", name "add-image1", class "file-input");
+                                ;input(type "hidden", name "add-image1-size", id "add-image1-size");
+                                ;input(type "file", name "add-image1", class "file-input", id "add-image1");
                               ==
                           ;div(style "margin-bottom: 10px;")
-                            ;p: "Image 1: {(trip filename1.u.image1.+.a)}"
-                            ;div(style "display: flex; gap: 10px; align-items: center;")
-                              ;button(type "button", onclick "document.querySelector('input[name=delete-image1]').value='true'; this.parentElement.parentElement.style.opacity='0.5';", class "file-remove"): Remove Image 1
-                              ;input(type "file", name "replace-image1", class "file-input");
+                              ;p: "Image 1: {(trip filename1.u.image1.+.a)}"
+                              ;div(style "display: flex; gap: 10px; align-items: center;")
+                                ;button(type "button", onclick "document.querySelector('input[name=delete-image1]').value='true'; this.parentElement.parentElement.style.opacity='0.5';", class "file-remove"): Remove Image 1
+                                ;input(type "hidden", name "replace-image1-size", id "replace-image1-size");
+                                ;input(type "file", name "replace-image1", class "file-input", id "replace-image1");
+                              ==
+                              ;input(type "hidden", name "delete-image1", value "false");
+                              ;input(type "hidden", name "keep-image1", value "{(trip filename1.u.image1.a)}");
                             ==
-                            ;input(type "hidden", name "delete-image1", value "false");
-                            ;input(type "hidden", name "keep-image1", value "{(trip filename1.u.image1.a)}");
-                          ==
                         ;+  ?~  image2.+.a
                               ;div(style "margin-bottom: 10px;")
                                 ;p: "No Image 2 uploaded"
                                 ;label: "Add Image 2:"
-                                ;input(type "file", name "add-image2", class "file-input");
+                                ;input(type "hidden", name "add-image2-size", id "add-image2-size");
+                                ;input(type "file", name "add-image2", class "file-input", id "add-image2");
+
                               ==
-                            ;div(style "margin-bottom: 10px;")
+                           ;div(style "margin-bottom: 10px;")
                               ;p: "Image 2: {(trip filename2.u.image2.+.a)}"
                               ;div(style "display: flex; gap: 10px; align-items: center;")
                                 ;button(type "button", onclick "document.querySelector('input[name=delete-image2]').value='true'; this.parentElement.parentElement.style.opacity='0.5';", class "file-remove"): Remove Image 2
-                                ;input(type "file", name "replace-image2", class "file-input");
+                                ;input(type "hidden", name "replace-image2-size", id "replace-image2-size");
+                                ;input(type "file", name "replace-image2", class "file-input", id "replace-image2");
                               ==
                               ;input(type "hidden", name "delete-image2", value "false");
                               ;input(type "hidden", name "keep-image2", value "{(trip filename2.u.image2.a)}");
@@ -2062,9 +2073,357 @@
         ^+  state
         =/  data=octs  +.body.request.q.req
         ::=/  preview-end  `@t`(cut 3 [0 2.200] (swp 3 q.data))::  last 2200 bytes
-        =/  preview  `@t`(cut 3 [0 1.200] q.data):: first 1200 bytes
-        ~&  [%preview preview]
+        ::=/  preview  `@t`(cut 3 [0 3.000] q.data):: first 1200 bytes
+        ::~&  [%preview preview]
         ::~&  [%preview-end preview-end]
+        :: Simple string search function for everything beside image 1 and image2
+        =/  find-field
+          |=  [field-name=@t data=@]  :: Changed data=@t to data=@
+          ^-  @t
+          =/  field-name-binary  `@`field-name
+          =/  search-pattern  
+              %+  can  3
+              :~  [6 `@`'name="']                           :: "name=\"" (6 bytes)
+                  [(met 3 field-name-binary) field-name-binary]  :: fieldname
+                  [5 `@`'"\0d\0a\0d\0a']                    :: "\"\r\n\r\n (5 bytes)
+              ==
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  crlf  `@`'\0d\0a'
+          =/  i  0
+          |-
+          ?:  (gte (add i pattern-len) data-len)  ''  :: Not found
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the pattern, now extract the value
+            =/  value-start  (add i pattern-len)
+            =/  j  value-start
+            |-
+            ?:  (gte (add j 2) data-len)  
+              `@t`(cut 3 [value-start (sub data-len value-start)] data)  :: Convert to @t
+            =/  check  (cut 3 [j 2] data)
+            ?:  =(check crlf)
+              `@t`(cut 3 [value-start (sub j value-start)] data)  :: Convert to @t
+            $(j +(j))
+          $(i +(i))
+        ::
+        ::
+        =/  find-textarea-field
+          |=  [field-name=@t data=@]
+          ^-  @t
+          =/  field-name-binary  `@`field-name
+          =/  search-pattern  
+              %+  can  3
+              :~  [6 `@`'name="']
+                  [(met 3 field-name-binary) field-name-binary]
+                  [5 `@`'"\0d\0a\0d\0a']
+              ==
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  boundary-pattern  `@`'\0d\0a------'  :: Look for boundary instead of just CRLF
+          =/  i  0
+          |-
+          ?:  (gte (add i pattern-len) data-len)  ''
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            =/  value-start  (add i pattern-len)
+            =/  j  value-start
+            |-
+            ?:  (gte (add j 8) data-len)  
+              `@t`(cut 3 [value-start (sub data-len value-start)] data)
+            =/  check  (cut 3 [j 8] data)
+            ?:  =(check boundary-pattern)  :: Stop at next form boundary
+              `@t`(cut 3 [value-start (sub j value-start)] data)
+            $(j +(j))
+          $(i +(i))        
+        :: Optimized filename that uses known file sizes to jump to the right position
+        =/  find-filename-optimized
+          |=  [field-name=@t data=@ start-pos=@ud]
+          ^-  @t
+          =/  field-name-binary  `@`field-name 
+          =/  search-pattern  
+                %+  can  3
+                :~  [6 `@`'name="']
+                    [(met 3 field-name-binary) field-name-binary]
+                    [1 `@`'"']  
+                ==
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  i  start-pos  :: Start searching from given position
+          |-
+          ?:  (gte (add i pattern-len) data-len)  ''  :: Not found
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the field, now look for filename= within the next 200 characters
+            =/  j  (add i pattern-len)
+            =/  search-limit  (min (add j 200) data-len)
+            |-
+            ?:  (gte (add j 10) search-limit)  ''  :: filename= not found
+            =/  check  (cut 3 [j 10] data)
+            ?:  =(check `@`'filename="')
+              :: Found filename=", extract until closing quote
+              =/  filename-start  (add j 10)
+              =/  k  filename-start
+              |-
+              ?:  (gte k data-len)  ''
+              =/  char  (cut 3 [k 1] data)
+              ?:  =(char `@`'"')
+                `@t`(cut 3 [filename-start (sub k filename-start)] data)
+              $(k +(k))
+            $(j +(j))
+          $(i +(i))
+        :: Optimized file extraction that uses known file sizes to jump to the right position
+        =/  find-field-end-position
+          |=  [field-name=@t data=@]
+          ^-  @ud
+          =/  field-name-binary  `@`field-name
+          =/  search-pattern  
+              %+  can  3
+              :~  [6 `@`'name="']
+                  [(met 3 field-name-binary) field-name-binary]
+                  [5 `@`'"\0d\0a\0d\0a']
+              ==
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  crlf  `@`'\0d\0a'
+          =/  i  0
+          |-
+          ?:  (gte (add i pattern-len) data-len)  0  :: Not found, return 0
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the pattern, find where value ends
+            =/  value-start  (add i pattern-len)
+            =/  j  value-start
+            |-
+            ?:  (gte (add j 2) data-len)  data-len
+            =/  check  (cut 3 [j 2] data)
+            ?:  =(check crlf)
+              (add j 2)  :: Return position after the CRLF
+            $(j +(j))
+          $(i +(i))
+        =/  find-file-content-optimized
+          |=  [field-name=@t data=@ start-pos=@ud length=@ud]
+          ^-  [file-data=@ file-size=@ud]          
+          =/  field-name-binary  `@`field-name
+          =/  search-pattern  
+            %+  can  3
+            :~  [6 `@`'name="']
+                [(met 3 field-name-binary) field-name-binary]
+                [1 `@`'"']
+            == 
+          =/  pattern-len  (met 3 search-pattern)
+          =/  data-len  (met 3 data)
+          =/  double-crlf  `@`'\0d\0a\0d\0a'
+          =/  i  start-pos  :: Start searching from given position
+          
+          :: Find the field
+          |-
+          ?:  (gte (add i pattern-len) data-len)  [0 0]
+          =/  slice  (cut 3 [i pattern-len] data)
+          ?:  =(slice search-pattern)
+            :: Found the field, now find the double CRLF
+            =/  j  (add i pattern-len)
+            |-
+            ?:  (gte (add j 4) data-len)  [0 0]
+            =/  check  (cut 3 [j 4] data)
+            ?:  =(check double-crlf)
+              :: Found file content start
+              =/  content-start  (add j 4)
+              :: Now find the end
+              =/  k  content-start
+              [(cut 3 [content-start length] data) length]
+            $(j +(j))
+          $(i +(i))
+          ::
+          =/  find-content-type-optimized
+              |=  [field-name=@t data=@ start-pos=@ud]
+              ^-  @t
+              =/  field-name-binary  `@`field-name 
+              =/  search-pattern  
+                  %+  can  3
+                  :~  [6 `@`'name="']
+                      [(met 3 field-name-binary) field-name-binary]
+                      [1 `@`'"']
+                  ==
+              =/  pattern-len  (met 3 search-pattern)
+              =/  data-len  (met 3 data)
+              =/  i  start-pos  :: Start searching from given position
+              |-
+              ?:  (gte (add i pattern-len) data-len)  ''
+              =/  slice  (cut 3 [i pattern-len] data)
+              ?:  =(slice search-pattern)
+                =/  j  (add i pattern-len)
+                =/  section-end
+                  =/  k  j
+                  |-
+                  ?:  (gte (add k 6) data-len)  data-len
+                  =/  boundary-check  (cut 3 [k 6] data)
+                  ?:  =(boundary-check `@`'------')  k
+                  $(k +(k))
+                |-
+                ?:  (gte (add j 14) section-end)  ''
+                =/  check  (cut 3 [j 14] data)
+                ?:  =(check `@`'Content-Type: ')
+                  =/  value-start  (add j 14)
+                  =/  m  value-start
+                  |-
+                  ?:  (gte (add m 2) section-end)  
+                    `@t`(cut 3 [value-start (sub section-end value-start)] data)
+                  =/  check-end  (cut 3 [m 2] data)
+                  ?:  =(check-end `@`'\0d\0a')
+                    `@t`(cut 3 [value-start (sub m value-start)] data)
+                  $(m +(m))
+                $(j +(j))
+              $(i +(i))
+        :: Function to check if filename has valid image extension
+        =/  is-valid-image-extension
+          |=  filename=@t
+          ^-  ?
+          ?:  =(filename '')  %.y  :: Empty filename is valid (no file uploaded)
+          =/  filename-len  (met 3 filename)
+          ?:  (lth filename-len 4)  %.n  :: Too short to have .jpg/.png
+          =/  last-4  (cut 3 [(sub filename-len 4) 4] filename)
+          =/  last-5  ?:  (lth filename-len 5)  ''  (cut 3 [(sub filename-len 5) 5] filename)
+          ?|  =(last-4 '.jpg')
+              =(last-4 '.png')
+              =(last-4 '.JPG')
+              =(last-4 '.PNG')
+              =(last-5 '.jpeg')
+              =(last-5 '.JPEG')
+          ==
+        ::
+        ::=/  ad-id
+        ::~&  %ad-id
+        ::~>  %bout
+        ::  (find-field 'ad-id' +.data)
+        =/  ad-id  eny
+        =/  existing-ad  (~(get by mylistings1) ad-id)  :: Get existing ad AFTER ad-id is finalized
+        =/  is-existing-ad  ?=(^ existing-ad)
+        =/  image1-field-name  ?:  is-existing-ad  'replace-image1'  'image1'
+        =/  image2-field-name  ?:  is-existing-ad  'replace-image2'  'image2'
+        =/  adtitle  (find-field 'title' +.data)
+        =/  adtype  (find-field 'type' +.data) 
+        =/  adprice  (find-field 'price' +.data)
+        =/  adtimezone  (find-field 'timezone' +.data)
+        =/  adcontact  (find-field 'contact' +.data)
+        =/  addescription  (find-textarea-field 'description' +.data)
+        =/  adstatus  ?:  =((find-field 'active' +.data) '%.y')  %.y  %.n
+        =/  active-field-end  (find-field-end-position 'active' +.data)
+        =/  image-fields-start  ?:(=(active-field-end 0) 750 active-field-end)
+        =/  max-file-size  `@ud`(mul maxpic-size (mul 1.024 1.024))  :: limit (maxpic-size * 1024 * 1024 bytes)
+        =/  binary-data  +.data
+        =/  adfilename1  (find-filename-optimized image1-field-name +.data 0)  
+        =/  adfile1-size-text  (find-field 'image1-size' +.data)
+        :: Convert text to @ud safely
+        =/  adfile1-size-from-form=@ud
+          ?:  |(=(adfile1-size-text '') =(adfilename1 ''))
+            ::~&  [%skipping-file1-no-file]
+            0
+          ::~&  [%parsing-file1-size adfile1-size-text]
+          =/  parsed  (scan (trip adfile1-size-text) dim:ag)
+          ::~&  [%parsed-result-file1 parsed]
+          ?~  parsed  
+            ::~&  [%parse-failed-file1]
+            0
+          parsed
+        ::~&  [%adfile1-size-from-form adfile1-size-from-form]
+        =/  [adfile1=@ adfile1-size=@ud]  
+         ::~&  %find-file1
+        ::~>  %bout
+            (find-file-content-optimized image1-field-name binary-data 0 adfile1-size-from-form)
+        ::~&  [%adfile1-size adfile1-size]
+        =/  adcontenttype1  (find-content-type-optimized image1-field-name +.data 0)
+        =/  image2-start-estimate  
+            ?:  =(adfile1-size 0)  
+              image-fields-start  :: Start after 'active' field
+            (add 200 adfile1-size)  :: Start 200 bytes after image1 data ends
+          ::
+                  ::=/  adfilename2  (find-filename image2-field-name +.data)
+        ?:  (gth adfile1-size max-file-size)
+          :: Handle file1 too large error - return error response
+          =/  error-body  
+                %-  crip
+                %+  weld  "Error: Image 1 file size exceeds "
+                %+  weld  (trip (scot %ud maxpic-size))
+                " MB max picture size limit"
+          state(message-myads error-body)
+        
+          =/  adfilename2  (find-filename-optimized image2-field-name +.data image2-start-estimate)
+          =/  adfile2-size-text  (find-field 'image2-size' +.data)
+          ::~&  [%file-sizes-text adfile1-size-text adfile2-size-text]   
+          =/  adfile2-size-from-form=@ud
+            ?:  |(=(adfile2-size-text '') =(adfilename2 ''))
+              ::~&  [%skipping-file2-no-file]
+              0
+            ::~&  [%parsing-file2-size adfile2-size-text]
+            =/  parsed  (scan (trip adfile2-size-text) dim:ag)
+            ::~&  [%parsed-result-file2 parsed]
+            ?~  parsed  
+              ::~&  [%parse-failed-file2]
+              0
+            parsed
+           ::~&  [%adfile2-size-from-form adfile2-size-from-form] 
+      ::
+        =/  [adfile2=@ adfile2-size=@ud]  
+       :: ~&  %find-file2
+        ::~>  %bout
+          (find-file-content-optimized image2-field-name binary-data image2-start-estimate adfile2-size-from-form)    
+        :: Check file extensions
+          ?:  !(is-valid-image-extension adfilename1)
+            =/  error-body  'Error: Image 1 must be a PNG or JPG file'
+            state(message-myads error-body)
+          ?:  !(is-valid-image-extension adfilename2)
+            =/  error-body  'Error: Image 2 must be a PNG or JPG file'
+            state(message-myads error-body)
+        ?:  (gth adfile2-size max-file-size)
+          :: Handle file2 too large error - return error response
+          =/  error-body  
+              %-  crip
+              %+  weld  "Error: Image 2 file size exceeds "
+              %+  weld  (trip (scot %ud maxpic-size))
+        " MB max picture size limit"
+          state(message-myads error-body)
+        =/  adcontenttype2  (find-content-type-optimized image2-field-name +.data image2-start-estimate)
+        ::=/  delete-image1  =((find-field 'delete-image1' +.data) 'true')
+        ::=/  delete-image2  =((find-field 'delete-image2' +.data) 'true')
+        :: Get the existing filenames if they exist (text field with filename)
+        ::=/  keep-image1-filename  (find-field 'keep-image1' +.data)
+        ::=/  keep-image2-filename  (find-field 'keep-image2' +.data)
+        =/  image1-info
+            ::?:  delete-image1  
+            ::  ~  :: Explicitly delete
+            ?:  =(adfilename1 '')
+              ?~  existing-ad  ~  image1.u.existing-ad  :: Keep existing if no new upload
+            `[adfilename1 adcontenttype1 [adfile1-size adfile1]]  :: New upload or replacement
+        =/  image2-info
+            ::?:  delete-image2  
+            ::  ~  :: Explicitly delete
+            ?:  =(adfilename2 '')
+              ?~  existing-ad  ~  image2.u.existing-ad  :: Keep existing if no new upload
+            `[adfilename2 adcontenttype2 [adfile2-size adfile2]]  :: New upload or replacement
+        =/  new-advert  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus]
+        =/  new-advert1  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus image1-info image2-info]
+        =/  newlistings  ?:  =(%.y adstatus)
+                          (~(put by listings) ad-id new-advert)
+                          (~(del by listings) ad-id)
+        =/  newlistings1  ?:  =(%.y adstatus)
+                          (~(put by listings1) ad-id new-advert1)
+                          (~(del by listings1) ad-id)                  
+        =/  newmylistings  (~(put by mylistings) ad-id new-advert)  :: Update `mylistings`
+        =/  newmylistings1  (~(put by mylistings1) ad-id new-advert1)  :: Update `mylistings`
+        =/  new-alert-results  (alert-matches alerts newmylistings1)
+        =/  success-message  'Ad Added Successfully'
+        state(mylistings newmylistings, listings newlistings, mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
+                    ::
+    ::
+    ++  post-myad-state-update
+        |=  [req=(pair @ta inbound-request:eyre) now=@da our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) listings=(map id=@t advert) listings1=(map id=@t advert1) alerts=(map alert-id=@t alert) alert-results=(map ad-id=@t alert-result) message-myads=@t maxpic-size=@ud]
+        ^+  state
+        =/  data=octs  +.body.request.q.req
+        ::=/  preview-image2  `@t`(cut 3 [1.040.800 500] q.data)
+        ::=/  preview  `@t`(cut 3 [0 2.200] q.data):: first 2200 bytes
+        ::~&  [%preview preview]
+        ::~&  [%preview-image2 preview-image2]
         :: Simple string search function for everything beside image 1 and image2
         =/  find-field
         |=  [field-name=@t data=@]  :: Changed data=@t to data=@
@@ -2096,6 +2455,7 @@
           $(j +(j))
         $(i +(i))
         ::
+        ::
         =/  find-textarea-field
           |=  [field-name=@t data=@]
           ^-  @t
@@ -2125,49 +2485,35 @@
             $(j +(j))
           $(i +(i))
         :: Function to find filename in file upload fields
-        =/  find-filename
+        =/  find-field-end-position
           |=  [field-name=@t data=@]
-          ^-  @t
-          =/  field-name-binary  `@`field-name 
+          ^-  @ud
+          =/  field-name-binary  `@`field-name
           =/  search-pattern  
-                %+  can  3
-                :~  [6 `@`'name="']
-                    [(met 3 field-name-binary) field-name-binary]
-                    [1 `@`'"']  
-                ==
+              %+  can  3
+              :~  [6 `@`'name="']
+                  [(met 3 field-name-binary) field-name-binary]
+                  [5 `@`'"\0d\0a\0d\0a']
+              ==
           =/  pattern-len  (met 3 search-pattern)
           =/  data-len  (met 3 data)
+          =/  crlf  `@`'\0d\0a'
           =/  i  0
           |-
-          ?:  (gte (add i pattern-len) data-len)  
-            ::~&  [%field-not-found field-name]
-            ''  :: Not found
+          ?:  (gte (add i pattern-len) data-len)  0  :: Not found, return 0
           =/  slice  (cut 3 [i pattern-len] data)
           ?:  =(slice search-pattern)
-            ::~&  [%found-name-field field-name at-position=i]
-            :: Found the field, now look for filename= within the next 200 characters
-            =/  j  (add i pattern-len)
-            =/  search-limit  (min (add j 200) data-len)  :: Search up to 200 chars ahead
+            :: Found the pattern, find where value ends
+            =/  value-start  (add i pattern-len)
+            =/  j  value-start
             |-
-            ?:  (gte (add j 10) search-limit)  
-              ~&  [%filename-not-found-for field-name]
-              ''  :: filename= not found
-            =/  check  (cut 3 [j 10] data)
-            ?:  =(check `@`'filename="')
-              :: Found filename=", extract until closing quote
-              =/  filename-start  (add j 10)
-              =/  k  filename-start
-              |-
-              ?:  (gte k data-len)  ''
-              =/  char  (cut 3 [k 1] data)
-              ?:  =(char `@`'"')
-                =/  result  `@t`(cut 3 [filename-start (sub k filename-start)] data)
-                ::~&  [%extracted-filename field-name result at-position=filename-start]
-                result
-              $(k +(k))
-            :: Don't stop at \0d, keep searching
+            ?:  (gte (add j 2) data-len)  data-len
+            =/  check  (cut 3 [j 2] data)
+            ?:  =(check crlf)
+              (add j 2)  :: Return position after the CRLF
             $(j +(j))
           $(i +(i))
+        ::
         =/  find-content-type
             |=  [field-name=@t data=@]
             ^-  @t
@@ -2275,6 +2621,7 @@
           ?:  (gte (add i pattern-len) data-len)  ''  :: Not found
           =/  slice  (cut 3 [i pattern-len] data)
           ?:  =(slice search-pattern)
+          ::~&  [%found-field field-name 'at-byte-position' i]
             :: Found the field, now look for filename= within the next 200 characters
             =/  j  (add i pattern-len)
             =/  search-limit  (min (add j 200) data-len)
@@ -2294,8 +2641,8 @@
             $(j +(j))
           $(i +(i))
         :: Optimized file extraction that uses known file sizes to jump to the right position
-        =/  find-file-content-optimized
-          |=  [field-name=@t data=@ start-pos=@ud]
+         =/  find-file-content-optimized
+          |=  [field-name=@t data=@ start-pos=@ud length=@ud]
           ^-  [file-data=@ file-size=@ud]          
           =/  field-name-binary  `@`field-name
           =/  search-pattern  
@@ -2324,19 +2671,50 @@
               =/  content-start  (add j 4)
               :: Now find the end
               =/  k  content-start
-              |-
-              ?:  (gte (add k 8) data-len)  
-                =/  final-end  (sub data-len 2)
-                =/  file-content  (cut 3 [content-start (sub final-end content-start)] data)
-                [file-content `@ud`(sub final-end content-start)]
-              =/  boundary-pattern  `@`'\0d\0a------'
-              =/  boundary-check  (cut 3 [k 8] data)
-              ?:  =(boundary-check boundary-pattern)
-                =/  file-content  (cut 3 [content-start (sub k content-start)] data)
-                [file-content `@ud`(sub k content-start)]
-              $(k +(k))
+              [(cut 3 [content-start length] data) length]
             $(j +(j))
           $(i +(i))
+          ::
+          =/  find-content-type-optimized
+              |=  [field-name=@t data=@ start-pos=@ud]
+              ^-  @t
+              =/  field-name-binary  `@`field-name 
+              =/  search-pattern  
+                  %+  can  3
+                  :~  [6 `@`'name="']
+                      [(met 3 field-name-binary) field-name-binary]
+                      [1 `@`'"']
+                  ==
+              =/  pattern-len  (met 3 search-pattern)
+              =/  data-len  (met 3 data)
+              =/  i  start-pos  :: Start searching from given position
+              |-
+              ?:  (gte (add i pattern-len) data-len)  ''
+              =/  slice  (cut 3 [i pattern-len] data)
+              ?:  =(slice search-pattern)
+                =/  j  (add i pattern-len)
+                =/  section-end
+                  =/  k  j
+                  |-
+                  ?:  (gte (add k 6) data-len)  data-len
+                  =/  boundary-check  (cut 3 [k 6] data)
+                  ?:  =(boundary-check `@`'------')  k
+                  $(k +(k))
+                |-
+                ?:  (gte (add j 14) section-end)  ''
+                =/  check  (cut 3 [j 14] data)
+                ?:  =(check `@`'Content-Type: ')
+                  =/  value-start  (add j 14)
+                  =/  m  value-start
+                  |-
+                  ?:  (gte (add m 2) section-end)  
+                    `@t`(cut 3 [value-start (sub section-end value-start)] data)
+                  =/  check-end  (cut 3 [m 2] data)
+                  ?:  =(check-end `@`'\0d\0a')
+                    `@t`(cut 3 [value-start (sub m value-start)] data)
+                  $(m +(m))
+                $(j +(j))
+              $(i +(i))
           ::
           =/  find-content-type-optimized
               |=  [field-name=@t data=@ start-pos=@ud]
@@ -2396,13 +2774,12 @@
           ==
         ::
         =/  ad-id
-        ~>  %bout
           (find-field 'ad-id' +.data)
         =/  ad-id  ?~(ad-id eny ad-id)
         =/  existing-ad  (~(get by mylistings1) ad-id)  :: Get existing ad AFTER ad-id is finalized
         =/  is-existing-ad  ?=(^ existing-ad)
-        =/  image1-field-name  ?:  is-existing-ad  'replace-image1'  'image1'
-        =/  image2-field-name  ?:  is-existing-ad  'replace-image2'  'image2'
+        ::=/  image1-field-name  ?:  is-existing-ad  'replace-image1'  'image1'
+        ::=/  image2-field-name  ?:  is-existing-ad  'replace-image2'  'image2'
         =/  adtitle  (find-field 'title' +.data)
         =/  adtype  (find-field 'type' +.data) 
         =/  adprice  (find-field 'price' +.data)
@@ -2412,10 +2789,29 @@
         =/  adstatus  ?:  =((find-field 'active' +.data) '%.y')  %.y  %.n
         =/  max-file-size  `@ud`(mul maxpic-size (mul 1.024 1.024))  :: limit (maxpic-size * 1024 * 1024 bytes)
         =/  binary-data  +.data
-        =/  adfilename1  (find-filename image1-field-name +.data)  
-        =/  adfile1-size-text  (find-field 'image1-size' +.data)
-        :: Convert text to @ud safely
-        =/  adfile1-size-from-form=@ud
+        ::=/  adfilename1  (find-filename-optimized image1-field-name +.data 0)  
+        ::=/  try-add-image1  (find-filename-optimized 'add-image1' +.data 0)
+         ::~>  %bout
+       =/  image1-operation
+          =/  has-add  !=('' (find-filename-optimized 'add-image1' +.data 0))
+          =/  has-replace  !=('' (find-filename-optimized 'replace-image1' +.data 0))
+          =/  delete-img1  (find-field 'delete-image1' +.data)
+          ?:  has-add  'add-image1'
+          ?:  has-replace  'replace-image1'
+          ?:  =(delete-img1 'true')  'delete-image1'
+          ''
+      ::~&  [%image1-operation image1-operation]
+      =/  adfile1-size-text  
+        ?:  =(image1-operation '')  ''
+        =/  size-field  (cat 3 image1-operation '-size')
+        (find-field size-field +.data)
+        ::~&  [%adfile1-size-text adfile1-size-text]
+         ::
+      =/  adfilename1  
+        ?:  |(=(image1-operation 'delete-image1') =(image1-operation ''))  ''
+        (find-filename-optimized image1-operation +.data 0)
+      ::~&  [%adfilename1 adfilename1]
+      =/  adfile1-size-from-form=@ud
           ?:  |(=(adfile1-size-text '') =(adfilename1 ''))
             ::~&  [%skipping-file1-no-file]
             0
@@ -2425,52 +2821,71 @@
           ?~  parsed  
             ::~&  [%parse-failed-file1]
             0
-          parsed
+          parsed      
+        =/  [adfile1=@ adfile1-size=@ud]
+        ?:  |(=(image1-operation 'delete-image1') =(image1-operation ''))  ['' 0]  
+          (find-file-content-optimized image1-operation binary-data 0 adfile1-size-from-form)
+        =/  adfile1-present  ?:  =(adfile1 0)  %.n  %.y
+        ::~&  [%adfile1 adfile1-present]
+        =/  adcontenttype1
+          ?:  |(=(image1-operation 'delete-image1') =(image1-operation ''))  ''  
+            (find-content-type-optimized image1-operation +.data 0)
+          ::~&  [%adcontenttype1 adcontenttype1]
         =/  image2-start-estimate  
-            ?:  =(adfile1-size-from-form 0)  
-              0  :: If no image1, start from beginning
-            :: Find where image1 field starts, add size + reasonable header buffer
-            (add 800 adfile1-size-from-form)  :: 900 bytes covers all fields before image1 + headers
+            ?:  =(adfile1-size-from-form 0)  0
+                (add 1.000 adfile1-size-from-form)
           ::
                   ::=/  adfilename2  (find-filename image2-field-name +.data)
-        ?:  (gth adfile1-size-from-form max-file-size)
-          :: Handle file1 too large error - return error response
-          =/  error-body  
-                %-  crip
-                %+  weld  "Error: Image 1 file size exceeds "
-                %+  weld  (trip (scot %ud maxpic-size))
-                " MB max picture size limit"
-          state(message-myads error-body)
+        :: Validate image1 size
+        ::~&  [%image2-start-estimate image2-start-estimate]
+      ?:  (gth adfile1-size max-file-size)
+        =/  error-body  
+          %-  crip
+          %+  weld  "Error: Image 1 file size exceeds "
+          %+  weld  (trip (scot %ud maxpic-size))
+          " MB max picture size limit"
+        state(message-myads error-body)
         
-        =/  [adfile1=@ adfile1-size=@ud]  
-            (find-file-content-optimized image1-field-name binary-data 0)
-        =/  adcontenttype1  (find-content-type-optimized image1-field-name +.data 0)
-        =/  adfilename2  (find-filename-optimized image2-field-name +.data image2-start-estimate)
-        =/  adfile2-size-text  (find-field 'image2-size' +.data)
-        ::~&  [%file-sizes-text adfile1-size-text adfile2-size-text]   
-        =/  adfile2-size-from-form=@ud
+       :: Cache the search results for image2
+       ::~>  %bout
+      =/  image2-operation
+        =/  has-add  !=('' (find-filename-optimized 'add-image2' +.data image2-start-estimate))
+        =/  has-replace  !=('' (find-filename-optimized 'replace-image2' +.data image2-start-estimate))
+        =/  delete-img2  (find-field 'delete-image2' +.data)
+        ?:  has-add  'add-image2'
+        ?:  has-replace  'replace-image2'
+        ?:  =(delete-img2 'true')  'delete-image2'
+        ''
+      ::~&  [%image2-operation image2-operation]
+      =/  adfile2-size-text  
+          ?:  =(image2-operation '')  ''
+          =/  size-field  (cat 3 image2-operation '-size')
+          (find-field size-field +.data)
+      ::~&  [%adfile2-size-text adfile2-size-text]
+      =/  adfilename2  
+          ?:  |(=(image2-operation 'delete-image2') =(image2-operation ''))  ''
+        (find-filename-optimized image2-operation +.data image2-start-estimate)
+       :: ~&  [%adfilename2 adfilename2]
+      =/  adfile2-size-from-form=@ud
           ?:  |(=(adfile2-size-text '') =(adfilename2 ''))
-            ::~&  [%skipping-file2-no-file]
+            ::~&  [%skipping-file1-no-file]
             0
-          ::~&  [%parsing-file2-size adfile2-size-text]
+          ::~&  [%parsing-file1-size adfile1-size-text]
           =/  parsed  (scan (trip adfile2-size-text) dim:ag)
-          ::~&  [%parsed-result-file2 parsed]
+          ::~&  [%parsed-result-file1 parsed]
           ?~  parsed  
-            ::~&  [%parse-failed-file2]
+            ::~&  [%parse-failed-file1]
             0
           parsed
-::
-        ?:  (gth adfile2-size-from-form max-file-size)
-          :: Handle file2 too large error - return error response
-          =/  error-body  
-              %-  crip
-              %+  weld  "Error: Image 2 file size exceeds "
-              %+  weld  (trip (scot %ud maxpic-size))
-        " MB max picture size limit"
-          state(message-myads error-body)
-
-        =/  [adfile2=@ adfile2-size=@ud]  
-          (find-file-content-optimized image2-field-name binary-data image2-start-estimate)    
+        ::
+       :: ~&  [%adfile2-size-from-form adfile2-size-from-form] 
+      =/  [adfile2=@ adfile2-size=@ud]
+      ?:  |(=(image2-operation 'delete-image2') =(image2-operation ''))  ['' 0]  
+      (find-file-content-optimized image2-operation binary-data image2-start-estimate adfile2-size-from-form)
+      ::~&  [%adfile2-first-20-bytes `@t`(cut 3 [0 20] adfile2)]
+      =/  adfile2-present  ?:  =(adfile2-size 0)  %.n  %.y
+       :: ~&  [%adfile2 adfile2-present]
+      ::~&  [%adfile2-size adfile2-size]  
         :: Check file extensions
           ?:  !(is-valid-image-extension adfilename1)
             =/  error-body  'Error: Image 1 must be a PNG or JPG file'
@@ -2478,46 +2893,43 @@
           ?:  !(is-valid-image-extension adfilename2)
             =/  error-body  'Error: Image 2 must be a PNG or JPG file'
             state(message-myads error-body)
-        ::=/  adcontenttype1  (find-content-type image1-field-name +.data)
-        ::=/  adcontenttype2  (find-content-type image2-field-name +.data)
-        ::=/  [adfile1=@ adfile1-size=@ud]  (find-file-content-with-size image1-field-name binary-data)
-        ::=/  [adfile2=@ adfile2-size=@ud]  (find-file-content-with-size image2-field-name binary-data)
-        =/  adcontenttype2  (find-content-type-optimized image2-field-name +.data image2-start-estimate)
-        ::~&  [%file-sizes-parsed adfile1-size-from-form adfile2-size-from-form]          
-        ::~&  [%image-filenames adfilename1 adfilename2]
-        ::~&  [%comparing-files-1 calc-size=adfile1-size text-size=adfile1-size-from-form match==(adfile1-size adfile1-size-from-form)]
-        ::~&  [%comparing-files-2 calc-size=adfile2-size text-size=adfile2-size-from-form match==(adfile2-size adfile2-size-from-form)]
-        =/  delete-image1  =((find-field 'delete-image1' +.data) 'true')
-        =/  delete-image2  =((find-field 'delete-image2' +.data) 'true')
-
-        
+        ?:  (gth adfile2-size max-file-size)
+          :: Handle file2 too large error - return error response
+          =/  error-body  
+              %-  crip
+              %+  weld  "Error: Image 2 file size exceeds "
+              %+  weld  (trip (scot %ud maxpic-size))
+        " MB max picture size limit"
+          state(message-myads error-body)
+       =/  adcontenttype2
+       ?:  |(=(image2-operation 'delete-image2') =(image2-operation ''))  ''   
+            (find-content-type-optimized image2-operation +.data image2-start-estimate)
+        ::~&  [%adcontenttype2 adcontenttype2]
         =/  image1-info
-            ?:  delete-image1  
-              ~  :: Explicitly delete
-            ?:  =(adfilename1 '')
-              ?~  existing-ad  ~  image1.u.existing-ad  :: Keep existing if no new upload
+            ?:  =(image1-operation 'delete-image1')
+              ~  :: Only delete if explicitly requested
+            ?:  |(=(image1-operation '') =(adfilename1 ''))
+              ?~  existing-ad  ~  image1.u.existing-ad  :: Keep existing if no operation or no new file
             `[adfilename1 adcontenttype1 [adfile1-size adfile1]]  :: New upload or replacement
-        =/  image2-info
-            ?:  delete-image2  
-              ~  :: Explicitly delete
-            ?:  =(adfilename2 '')
-              ?~  existing-ad  ~  image2.u.existing-ad  :: Keep existing if no new upload
-            `[adfilename2 adcontenttype2 [adfile2-size adfile2]]  :: New upload or replacement
-        =/  new-advert  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus]
+       =/  image2-info
+          ?:  =(image2-operation 'delete-image2')
+            ~  :: Only delete if explicitly requested
+          ?:  |(=(image2-operation '') =(adfilename2 ''))
+            ?~  existing-ad  ~  image2.u.existing-ad  :: Keep existing if no operation or no new file
+          `[adfilename2 adcontenttype2 [adfile2-size adfile2]]  :: New upload or replacement
         =/  new-advert1  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus image1-info image2-info]
-        =/  newlistings  ?:  =(%.y adstatus)
-                          (~(put by listings) ad-id new-advert)
-                          (~(del by listings) ad-id)
+        ::=/  newlistings  ?:  =(%.y adstatus)
+                          ::(~(put by listings) ad-id new-advert)
+                          ::(~(del by listings) ad-id)
         =/  newlistings1  ?:  =(%.y adstatus)
                           (~(put by listings1) ad-id new-advert1)
                           (~(del by listings1) ad-id)                  
-        =/  newmylistings  (~(put by mylistings) ad-id new-advert)  :: Update `mylistings`
+        ::=/  newmylistings  (~(put by mylistings) ad-id new-advert)  :: Update `mylistings`
         =/  newmylistings1  (~(put by mylistings1) ad-id new-advert1)  :: Update `mylistings`
         =/  new-alert-results  (alert-matches alerts newmylistings1)
         =/  success-message  'Ad Added Successfully'
-        state(mylistings newmylistings, listings newlistings, mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
+        state(mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
                     ::
-    ::
     ::
     ++  update-myalert-state
       |=  [req=(pair @ta inbound-request:eyre) now=@da our=@p eny=@t alerts=(map id=@t alert) listings=(map id=@t advert) listings1=(map id=@t advert1) alert-results=(map ad-id=@t alert-result)]
@@ -2790,8 +3202,10 @@
           [%give %fact ~[/http-response/[-.req]] %http-response-header !>([404 ['Content-Type' 'text/plain'] ~])]
         ::
         =/  [filename=@t content-type=@t body=octs]  u.image-data
+        =/  size-tape  (a-co:co p.body)
+        =/  size-cord  (crip size-tape)
         ::  Return the image with proper headers
-        :~  [%give %fact ~[/http-response/[-.req]] %http-response-header !>([200 ~[['Content-Type' content-type] ['Content-Length' (scot %ud p.body)] ['Access-Control-Allow-Origin' '*']]])]
+        :~  [%give %fact ~[/http-response/[-.req]] %http-response-header !>([200 ~[['Content-Type' content-type] ['Content-Length' size-cord] ['Cache-Control' 'public, max-age=31536000'] ['Accept-Ranges' 'bytes'] ['Access-Control-Allow-Origin' '*']]])]
             [%give %fact ~[/http-response/[-.req]] %http-response-data !>(`body)]
             [%give %kick ~[/http-response/[-.req]] ~]
         ==
@@ -2862,15 +3276,15 @@
                     ;*  ?~  listinginfo
                           ~
                           :~  ;div  :: Images section - always present, but conditionally populated
-                                ;*  ?~  image1.u.listinginfo
-                                      ~
-                                      :~  ;div(class "ad-images-container")
-                                            ;img(src "/apps/xchange/img/listing/{(trip id-value.purl-pair)}/1", alt "Ad Image 1", style "max-width: 600px; max-height: 600px; object-fit: cover; border-radius: 4px;");
-                                            ;*  ?~  image2.u.listinginfo
-                                                  ~
-                                                  :~  ;img(src "/apps/xchange/img/listing/{(trip id-value.purl-pair)}/2", alt "Ad Image 2", style "max-width: 600px; max-height: 600px; object-fit: cover; border-radius: 4px;");
-                                                  ==
-                                          ==
+                               ;div(class "ad-images-container")
+                                      ;*  ?~  image1.u.listinginfo
+                                            ~
+                                            :~  ;img(src "/apps/xchange/img/listing/{(trip id-value.purl-pair)}/1", alt "Ad Image 1", style "max-width: 600px; max-height: 600px; object-fit: cover; border-radius: 4px; margin: 5px;");
+                                            ==
+                                      ;*  ?~  image2.u.listinginfo
+                                            ~
+                                            :~  ;img(src "/apps/xchange/img/listing/{(trip id-value.purl-pair)}/2", alt "Ad Image 2", style "max-width: 600px; max-height: 600px; object-fit: cover; border-radius: 4px; margin: 5px;");
+                                            ==
                                           ;div.spacer
                                             ;br;
                                             ;br;
@@ -3627,8 +4041,8 @@
                           =/  error-body  'Error: Invalid Max Picture Size needs to be an integer'       
                       state(message-settings error-body)
                     =/  new-maxpic-size  `@ud`u.maybe-maxpic-size 
-                      ?:  |((gth new-maxpic-size 3) (lth new-maxpic-size 0))
-                      =/  error-body  'Error: Max Picture Size exceeds 0-3MB limit'       
+                      ?:  |((gte new-maxpic-size 4) (lth new-maxpic-size 0))
+                      =/  error-body  'Error: Max Picture Size exceeds 0-4MB limit'       
                       state(message-settings error-body)
                       ::~&  [%new-maxpic-size new-maxpic-size]
                     =/  maxad-days-cord  (snag 1 parsedata)
@@ -3760,7 +4174,7 @@
           |=  our=@p
           ^-  @ud
           =/  state-size=@ud  (met 3 (jam state))
-        (mul state-size 5)
+        (mul state-size 2)
 
       ++  format-memory-size
           |=  size=@ud
@@ -4182,62 +4596,102 @@
                     [%give %kick [/http-response/[p.req]]~ ~]   
                 ==
         ::
-    ++  script
-        ^~
-        %-  trip
-        '''
-          document.addEventListener('DOMContentLoaded', function() {
-            const maxSize = 2 * 1024 * 1024;
-            const fileInputs = document.querySelectorAll('.file-input');
-            
-            fileInputs.forEach(function(input) {
-              input.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file) {
-                  // Update the corresponding hidden size field
-                  const sizeInput = document.getElementById(e.target.id + '-size');
-                  if (sizeInput) {
-                    sizeInput.value = file.size;
-                  } 
-                  if (file.size > maxSize) {
-                    alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
-                          (file.size / 1024 / 1024).toFixed(2) + 'MB');
+      ++  script
+          ^~
+          %-  trip
+          '''
+            document.addEventListener('DOMContentLoaded', function() {
+              const maxSize = 4 * 1024 * 1024;
+              const fileInputs = document.querySelectorAll('.file-input');
+              
+              // Initialize image reducer
+              const reduce = new ImageBlobReduce();
+              
+              fileInputs.forEach(function(input) {
+                input.addEventListener('change', async function(e) {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  
+                  // Only process images
+                  if (!file.type.startsWith('image/')) {
+                    alert('Please select an image file (JPEG or PNG)');
                     e.target.value = '';
-                    if (sizeInput) sizeInput.value = '';
+                    return;
                   }
-                }
-              });
-            });
-            
-            // Handle manage page file inputs (add-image and replace-image)
-            const manageInputs = document.querySelectorAll('input[name^="add-image"], input[name^="replace-image"]');
-            manageInputs.forEach(function(input) {
-              input.addEventListener('change', function(e) {
-                const file = e.target.files[0];
-                if (file && file.size > maxSize) {
-                  alert('File ' + file.name + ' is too large. Maximum size is 2MB. Selected file is ' + 
-                        (file.size / 1024 / 1024).toFixed(2) + 'MB');
-                  e.target.value = '';
-                }
-              });
-            });
-            
-            // Submit validation for postad form
-            const postAdForm = document.querySelector('form[action="/apps/xchange/postad"]');
-            if (postAdForm) {
-              postAdForm.addEventListener('submit', function(e) {
-                for (let input of fileInputs) {
-                  const file = input.files[0];
-                  if (file && file.size > maxSize) {
-                    e.preventDefault();
-                    alert('Please remove files larger than 2MB before submitting');
-                    return false;
+                  
+                  try {
+                    // Compress image to max 1200px width/height
+                    const blob = await reduce.toBlob(file, { max: 1200 });
+                    
+                    // Create new file from compressed blob
+                    const resizedFile = new File([blob], file.name, {
+                      type: blob.type,
+                      lastModified: Date.now()
+                    });
+                    
+                    // Replace the file input with compressed version
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(resizedFile);
+                    e.target.files = dataTransfer.files;
+                    
+                    // Update the corresponding hidden size field
+                    const sizeInput = document.getElementById(e.target.id + '-size');
+                    if (sizeInput) {
+                      sizeInput.value = resizedFile.size;
+                    }
+                    
+                    // Check if compressed file is still too large
+                    if (resizedFile.size > maxSize) {
+                      alert('File ' + file.name + ' is too large even after compression. Maximum size is 4MB. Compressed file is ' + 
+                            (resizedFile.size / 1024 / 1024).toFixed(2) + 'MB');
+                      e.target.value = '';
+                      if (sizeInput) sizeInput.value = '';
+                    } else {
+                      // Show compression results
+                      const originalKB = (file.size / 1024).toFixed(0);
+                      const compressedKB = (resizedFile.size / 1024).toFixed(0);
+                      const savings = ((1 - resizedFile.size / file.size) * 100).toFixed(0);
+                      console.log('Compressed ' + file.name + ': ' + originalKB + 'KB → ' + compressedKB + 'KB (' + savings + '% reduction)');
+                    }
+                  } catch (err) {
+                    console.error('Image compression failed:', err);
+                    alert('Failed to process image. Please try a different file.');
+                    e.target.value = '';
                   }
-                }
+                });
               });
-            }
-          });
-        '''
+              
+              // Submit validation for postad form
+              const postAdForm = document.querySelector('form[action="/apps/xchange/postad"]');
+              if (postAdForm) {
+                postAdForm.addEventListener('submit', function(e) {
+                  for (let input of fileInputs) {
+                    const file = input.files[0];
+                    if (file && file.size > maxSize) {
+                      e.preventDefault();
+                      alert('Please remove files larger than 2MB before submitting');
+                      return false;
+                    }
+                  }
+                });
+              }
+              
+              // Submit validation for manage/update form
+              const manageForm = document.querySelector('form[action*="/manage/"]');
+              if (manageForm) {
+                manageForm.addEventListener('submit', function(e) {
+                  for (let input of fileInputs) {
+                    const file = input.files[0];
+                    if (file && file.size > maxSize) {
+                      e.preventDefault();
+                      alert('Please remove files larger than 4MB before submitting');
+                      return false;
+                    }
+                  }
+                });
+              }
+            });
+          '''
     ++  style
             ^~
             %-  trip
@@ -4676,7 +5130,9 @@
             th {
               font-size: 24px;
               font-weight: 600;
-              color: black;
+              color: #000000 !important;
+              -webkit-text-size-adjust: 100%;
+              line-height: 1.5;
             }
 
             .ad-id-cell {
