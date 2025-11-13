@@ -420,7 +420,7 @@
                         =/  new-count  `@ud`(sub ~(wyt by new-alert-results) ~(wyt by alert-results))
                         =/  msg  (crip (weld "Xchange App: There are " (weld (scow %ud new-count) " new matche(s)!")))
                         =/  hark-card  (send-hark our.bowl msg now.bowl `@uvH`eny.bowl)
-                        :_  this(listings1 new-listings, alert-results new-alert-results, alert-results cleaned-alert-results)
+                        :_  this(listings1 new-listings, alert-results new-alert-results)
                         ~[hark-card]
                       :: CASE: no new alert results
                       [~ this(listings1 new-listings, alert-results new-alert-results)]
@@ -792,64 +792,73 @@
                         ==                 :: closes `;table`
                       ==                   :: closes `;div#table-all`           
                   ;div.table-div
-                        ;table(style "width: 90%")
-                          ;tr
-                            ;th(style "width: 220px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "thumbnail");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline;"): Thumbnail
-                              ==
-                            ==
-                            ;th(style "width: 150px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "title");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline;"): Title {?:(=(column.updated-sort-state 'title') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 100px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "date");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline;"): Date Posted {?:(=(column.updated-sort-state 'date') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 80px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "type");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): Type {?:(=(column.updated-sort-state 'type') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 80px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "price");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): Price {?:(=(column.updated-sort-state 'price') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 100px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "timezone");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): Timezone {?:(=(column.updated-sort-state 'timezone') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 120px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "contact");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): Contact Information {?:(=(column.updated-sort-state 'contact') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 120px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "ship");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): ship {?:(=(column.updated-sort-state 'ship') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 200px; text-align: center;")
-                              ;form(method "post", style "display: inline;")
-                                ;input(type "hidden", name "column", value "body");
-                                ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 24px; text-decoration: underline; text-align: center;"): Description {?:(=(column.updated-sort-state 'body') ?:(ascending.updated-sort-state "↑" "↓") "")}
-                              ==
-                            ==
-                            ;th(style "width: 80px; text-align: center;"): Actions
-                          ==               :: closes `;tr`
+                    ;table(style "width: 90%")
+                      ;tr
+                        ;th(style "width: 220px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "thumbnail");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline;"): Thumbnail
+                          ==
+                        ==
+                        
+                        ;th(style "width: 150px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "title");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Title {?:(=(column.updated-sort-state 'title') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 100px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "date");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Date Posted {?:(=(column.updated-sort-state 'date') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 80px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "type");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Type {?:(=(column.updated-sort-state 'type') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 80px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "price");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Price {?:(=(column.updated-sort-state 'price') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 100px; text-align: center; font-size: 16px;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "timezone");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Timezone {?:(=(column.updated-sort-state 'timezone') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 120px; text-align: center;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "contact");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Contact Information {?:(=(column.updated-sort-state 'contact') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 120px; text-align: center;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "ship");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): ship {?:(=(column.updated-sort-state 'ship') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 200px; text-align: center;")
+                          ;form(method "post")
+                            ;input(type "hidden", name "column", value "body");
+                            ;button(type "submit", style "background: none; border: none; cursor: pointer; font-size: 18px; text-decoration: underline; color: #000000 !important; -webkit-text-fill-color: #000000 !important;"): Description {?:(=(column.updated-sort-state 'body') ?:(ascending.updated-sort-state "🔼" "🔽") "")}
+                          ==
+                        ==
+                        
+                        ;th(style "width: 80px; text-align: center;"): Actions
+                      ==
                           ;*  %+  turn  sorted-listings
                             |=  a=[id=@t [ad-title=@t when=@da type=@t price=(unit @t) timezone=(unit @t) contact=@t ship=@p body=@t active=? image1=(unit image-info1) image2=(unit image-info2)]]
                               ;tr
@@ -2073,8 +2082,8 @@
         ^+  state
         =/  data=octs  +.body.request.q.req
         ::=/  preview-end  `@t`(cut 3 [0 2.200] (swp 3 q.data))::  last 2200 bytes
-        ::=/  preview  `@t`(cut 3 [0 3.000] q.data):: first 1200 bytes
-        ::~&  [%preview preview]
+        =/  preview  `@t`(cut 3 [0 3.000] q.data):: first 1200 bytes
+        ~&  [%preview preview]
         ::~&  [%preview-end preview-end]
         :: Simple string search function for everything beside image 1 and image2
         =/  find-field
@@ -4985,7 +4994,8 @@
             }
             .table-main {
               width: 80%;
-                margin-left: 0;
+              margin-left: 0;
+              font-size: 16px;
             }
             .table-div {
               display: flex;
@@ -5128,7 +5138,7 @@
             }
 
             th {
-              font-size: 24px;
+              font-size: 18px;
               font-weight: 600;
               color: #000000 !important;
               -webkit-text-size-adjust: 100%;
