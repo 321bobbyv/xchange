@@ -169,7 +169,7 @@
           [cards this(state new-state)]
           ::deleting ad button
         ?:  &(=(url.request.q.req '/apps/xchange/delete-myad') =(method.request.q.req %'POST'))
-            ~>  %bout
+            ::~>  %bout
             =/  new-state  (delete-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state)
             =/  myad-id  (get-myad-id-from-request req)  :: Helper function to extract ID
             =/  web-cards  (delete-myad-webpage req our.bowl eny mylistings.state)
@@ -178,12 +178,16 @@
             [fact-card web-cards]
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'GET'))
           =/  cards
-              (get-myad req our.bowl eny mylistings.state mylistings1.state message-myads.state sort-state.state)
+              (get-my-new-ads req our.bowl eny mylistings.state mylistings1.state message-myads.state sort-state.state)
           [cards this(state state(message-myads ''))]
           ::posting new add on post ad webpage
+        ?:  &(=(url.request.q.req '/apps/xchange/myads') =(method.request.q.req %'GET'))
+          =/  cards
+              (get-myad req our.bowl eny mylistings.state mylistings1.state message-myads.state sort-state.state)
+          [cards this(state state(message-myads ''))]
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'POST'))
           ::~&  %post-ad
-          ~>  %bout
+          ::~>  %bout
           =/  new-state  (post-myad-state req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
           =/  myinactive-listings  (get-inactive-listings mylistings1.new-state)
@@ -212,7 +216,7 @@
           [(get-view-alert req purl-pair now.bowl our.bowl eny alerts.state alert-results listings1.state) this]  
           :: update current ad
         ?:  &(?=([%xchange %manage-myad *] +.q.purl) =(method.request.q.req %'POST'))
-          ~>  %bout
+          ::~>  %bout
           =/  new-state  (post-myad-state-update req now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state alerts.state alert-results.state message-myads.state maxpic-size.state)
           =/  myactive-listings  (get-active-listings mylistings1.new-state)
           =/  myinactive-listings  (get-inactive-listings mylistings1.new-state)
@@ -759,7 +763,10 @@
                         ==
                         ;li
                           ;a(href "/apps/xchange/postad"): Post an Ad
-                        ==                       
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/myads"): My Ads
+                        ==                                      
                         ;li
                           ;a(href "/apps/xchange/pals"): Pals
                         ==
@@ -996,6 +1003,9 @@
                   ;a(href "/apps/xchange/postad"): Post an Ad
                 ==
                 ;li
+                  ;a(href "/apps/xchange/myads"): My Ads
+                == 
+                ;li
                   ;a(href "/apps/xchange/pals"): Pals
                 ==
                   ;li
@@ -1222,7 +1232,7 @@
         =/  newalerts  (~(put by alerts) newpair)
         =/  new-alert-results  (alert-matches newalerts listings1)
         state(alerts newalerts, alert-results new-alert-results)
-    ++  get-myad
+    ++  get-my-new-ads
       |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t sort-state=[column=@t ascending=?]]
       ^-  (list card)
       =/  listmylistings  ~(tap by mylistings1.state)
@@ -1281,6 +1291,9 @@
                 ;li
                   ;a(href "/apps/xchange/postad"): Post an Ad
                 ==
+                ;li
+                  ;a(href "/apps/xchange/myads"): My Ads
+                == 
                 ;li
                   ;a(href "/apps/xchange/pals"): Pals
                 ==
@@ -1493,13 +1506,189 @@
         ^-  (list card)
           =/  =response-header:http
               :-  301
-              :~  ['Location' '/apps/xchange/postad']
+              :~  ['Location' '/apps/xchange/myads']
               ==
           :~
               [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
               [%give %kick [/http-response/[p.req]]~ ~]
           ==
       ::
+    
+    ++  get-myad
+      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t sort-state=[column=@t ascending=?]]
+      ^-  (list card)
+      =/  listmylistings  ~(tap by mylistings1.state)
+      ::  Handle sorting from POST request
+      =/  updated-sort-state  (handle-sort req sort-state)
+      ::~&  [%debug-sort-state column.updated-sort-state ascending.updated-sort-state]
+      ::  Apply sorting to active listings
+      =/  sorted-listings  (sort-listings listmylistings column.updated-sort-state ascending.updated-sort-state)
+      =/  body
+        %-  as-octs:mimes:html
+        %-  crip
+        %-  en-xml:html
+        ;html
+            ;head
+              ;title:"Xchange"
+              ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
+              ;meta(charset "utf-8");
+              ;meta(name "viewport", content "width=device-width, initial-scale=1");
+              ;script(src "https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js");
+              ;script(src "https://cdn.jsdelivr.net/npm/image-blob-reduce@4.1.0/dist/image-blob-reduce.min.js");
+              ;script: {script}
+              ;style: {style}              
+            ==::closes head
+              ;body
+              ;div(class "header-wrapper")
+              ;img(src "/apps/xchange/img/xchange-logo.png", alt "Xchange Logo", class "header-logo");
+              ;div.search-bar
+                  ;form(method "get", action "/apps/xchange/search", class "search-form")
+                    ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
+                    ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
+                  ==                                   :: Closes form
+                ==   
+              ;div.ship-box                    
+                    ::;p: 
+                      ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
+                      ;img(src "/apps/xchange/sigil?p={(trip `@t`(scot %p our))}&size=175", alt "Your Sigil", class "ship-sigil"); 
+                        
+                      ;a(href "/apps/xchange/settings", style "color: #666; margin-left: 16px; font-size: 48px; text-decoration: none;"): ⚙️
+                            ::;p.ship-name: {(trip `@t`(scot %p our))}                         :: Closes div.ship-identity
+                  ==                             
+              == ::closes header-wrapper
+              ;div.spacer
+              ;br;
+              ;br;
+            ==::closes .spacer
+        ::
+        ;div.main-content
+            ;div.left-bar
+            ;ul
+                ;li
+                  ;a(href "/apps/xchange"): Home
+                ==
+                ;li
+                  ;a(href "/apps/xchange/alert"): Alerts
+                ==
+                ;li
+                  ;a(href "/apps/xchange/postad"): Post an Ad
+                ==
+                ;li
+                  ;a(href "/apps/xchange/myads"): My Ads
+                == 
+                ;li
+                  ;a(href "/apps/xchange/pals"): Pals
+                ==
+                  ;li
+                  ;a(href "/apps/xchange/subscriptions"): Subscriptions
+                ==
+              ==
+          ==::closes left-bar
+        ::
+            ;+  ?:  =(message-myads '')
+            ;div;
+          ::
+          =/  search-result  (find "Successfully" (trip message-myads))
+          =/  contains-success  ?=(^ search-result)
+          =/  bg-color  ?:(contains-success "#d4edda" "#f8d7da")
+          =/  border-color  ?:(contains-success "#c3e6cb" "#f5c6cb")
+          =/  text-color  ?:(contains-success "#155724" "#721c24")
+          ;div(style "display: flex; justify-content: center; margin: 20px 0;")
+            ;div(style "width: 75%; height: 300px; padding: 15px; text-align: center; background: {bg-color}; border: 1px solid {border-color}; border-radius: 4px; color: {text-color}; font-size: 18px;")
+              ;p: {(trip message-myads)}
+            ==
+          ==
+          
+          ;div.table-wrapper
+            ;+  ?:  =(mylistings1.state ~)
+                ;div.table-div
+                      ;table
+                        ;tr
+                        ;th: Thumbnail
+                        ;th: Title
+                        ;th: Date Posted
+                        ;th: Type
+                        ;th: Price
+                        ;th: Timezone
+                        ;th: Contact Information
+                        ;th: ship
+                        ;th: Description
+                        ;th: active
+                        ==:: closes tr
+                        ;tr
+                          ;td#empty-row(colspan "10")
+                              ;p: No Ads
+                          ==
+                        ==
+                      ==
+                  ==
+              =/  mylistingslist  ~(tap by mylistings1.state)
+                ;div.table-div
+                    ;table
+                      ;tr
+                        ;th: Thumbnail
+                        ;th: Title
+                        ;th: Date Posted
+                        ;th: Type
+                        ;th: Price
+                        ;th: Timezone
+                        ;th: Contact Information
+                        ;th: Ship
+                        ;th: Description
+                        ;th: Active
+                        ;th;  
+                      ==:: closes tr
+                      ;*  %+  turn  mylistingslist
+                              |=  a=[id=@t ad-title=@t when=@da type=@t price=(unit @t) timezone=(unit @t) contact=@t ship=@p body=@t active=? image1=(unit image-info1) image2=(unit image-info2)]
+                                ;tr
+                                  ;td(style "display: none;"): {(trip id.a)}
+                                  ;td(style "text-align: center; vertical-align: middle;")
+                                      ;+  ?~  image1.a
+                                        ;div(style "width: 80px; height: 80px; background-color: #ffffff; border: 0px solid #ddd; border-radius: 4px; display: inline-block;");
+                                      ?:  =(filename1.u.image1.a '')
+                                        ;div(style "width: 80px; height: 80px; background-color: #ffffff; border: 0px solid #ddd; border-radius: 4px; display: inline-block;");
+                                        ;img(src "/apps/xchange/img/listing/{(trip id.a)}/1", alt "Thumbnail", style "max-width: 80px; max-height: 80px; object-fit: cover; border-radius: 4px;");
+                                      ==
+                                          ::;td(style "font-family: monospace; font-size: 10px; background-color: yellow; word-break: break-all; white-space: normal; max-width: 100px; overflow-wrap: break-word;"): {(trip id.a)}
+                                  ;td
+                                    ;a(href "/apps/xchange/view-ad?ad-id={(trip id.a)}"): {(trip ad-title.a)}
+                                    ==
+                                  ;td: {(trip (get-date when.a))}
+                                  ;td: {(trip type.a)}
+                                  ;td: {?:((gth (lent (trip +.price.a)) 60) (weld (scag 60 (trip +.price.a)) "...") (trip +.price.a))}
+                                  ;td: {?:((gth (lent (trip +.timezone.a)) 60) (weld (scag 60 (trip +.timezone.a)) "...") (trip +.timezone.a))}
+                                  ;td: {?:((gth (lent (trip contact.a)) 60) (weld (scag 60 (trip contact.a)) "...") (trip contact.a))}
+                                  ;td: {(trip (scot %p ship.a))}
+                                  ;td(style "word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; white-space: normal;"): {?:((gth (lent (trip body.a)) 60) (weld (scag 60 (trip body.a)) "...") (trip body.a))}
+                                  ;td: {(trip (scot %f active.a))}
+                                  ;td
+                                      ;form(method "post", action "/apps/xchange/delete-myad")
+                                        ;input(type "hidden", name "myad-id", value "{(trip id.a)}");
+                                        ;button(type "submit", class "delete-button", onclick "return confirm('Are you sure you want to delete this ad?');"): Delete
+                                      == ::closes delete form
+                                      ;form(method "get", action "/apps/xchange/manage-myad")
+                                        ;input(type "hidden", name "myad-id", value "{(trip id.a)}");
+                                        ;button(type "submit", class "manage-button"): Manage
+                                      == ::closes manage form
+                                      ::;button(type "button", onclick "prompt('Ad ID (select and copy):', '{(trip id.a)}')", class "id-button"): View ID
+                                  == :: closes td
+                                ==     :: closes tr
+                    ==::closes table
+                  ==::closes ;div.table-wrapper
+              ==
+            ==   
+          ==::closes body
+      ==:: closes html
+        =/  =response-header:http
+            :-  200
+            :~  ['content-type' 'text/html; charset=utf-8']
+            ==
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+    ::
     ++  get-manage-myad 
             |=  [req=(pair @ta inbound-request:eyre) purl-pair=[myad-id=@t id-value=@t] now=@da our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1)]
             ^-  (list card)
@@ -1571,7 +1760,10 @@
                     ==
                     ;li
                       ;a(href "/apps/xchange/postad"): Post an Ad
-                    ==                       
+                    ==  
+                    ;li
+                      ;a(href "/apps/xchange/myads"): My Ads
+                    ==                      
                     ;li
                       ;a(href "/apps/xchange/pals"): Pals
                     ==
@@ -1660,10 +1852,13 @@
                     ==
                     ;tr
                       ;td: Active
-                        ;td
-                            ;select(name "active", class "dropdown")
-                              ;option(value "{(trip (scot %f active.a))}", selected "selected"): {?:(=(active.a %.y) "Yes" "No")}
+                      ;td
+                        ;select(name "active", class "dropdown")
+                          ;+  ?:  =(active.a %.y)
+                                ;option(value "%.y", selected "selected"): Yes
                               ;option(value "%.y"): Yes
+                          ;+  ?:  =(active.a %.n)
+                                ;option(value "%.n", selected "selected"): No
                               ;option(value "%.n"): No
                         ==
                       ==
@@ -1799,7 +1994,10 @@
                         ==
                         ;li
                           ;a(href "/apps/xchange/postad"): Post an Ad
-                        ==                       
+                        ==  
+                        ;li
+                          ;a(href "/apps/xchange/myads"): My Ads
+                        ==                      
                         ;li
                           ;a(href "/apps/xchange/pals"): Pals
                         ==
@@ -1896,16 +2094,19 @@
                       ==
                     ==
                   ==       
-                  ;tr
-                    ;td: Alert Active
-                    ;td
-                      ;select(name "active", class "dropdown")
-                        ;option(value "{(trip (scot %f active.a))}", selected "selected"): {?:(=(active.a %.y) "Yes" "No")}
-                        ;option(value "%.y"): Yes
-                        ;option(value "%.n"): No
+                 ;tr
+                      ;td: Active
+                      ;td
+                        ;select(name "active", class "dropdown")
+                          ;+  ?:  =(active.a %.y)
+                                ;option(value "%.y", selected "selected"): Yes
+                              ;option(value "%.y"): Yes
+                          ;+  ?:  =(active.a %.n)
+                                ;option(value "%.n", selected "selected"): No
+                              ;option(value "%.n"): No
+                        ==
                       ==
                     ==
-                  ==
 
                     ;tr
                       ;td(colspan "2", style "text-align: center;")
@@ -2000,6 +2201,9 @@
                           ;a(href "/apps/xchange/postad"): Post an Ad
                         ==
                         ;li
+                          ;a(href "/apps/xchange/myads"): My Ads
+                        == 
+                        ;li
                           ;a(href "/apps/xchange/alert"): Alerts
                         ==
                         ;li
@@ -2083,7 +2287,7 @@
         =/  data=octs  +.body.request.q.req
         ::=/  preview-end  `@t`(cut 3 [0 2.200] (swp 3 q.data))::  last 2200 bytes
         =/  preview  `@t`(cut 3 [0 3.000] q.data):: first 1200 bytes
-        ~&  [%preview preview]
+        ::~&  [%preview preview]
         ::~&  [%preview-end preview-end]
         :: Simple string search function for everything beside image 1 and image2
         =/  find-field
@@ -2980,7 +3184,7 @@
         ^-  (list card)
         =/  =response-header:http
           :-  303
-          :~  ['location' '/apps/xchange/postad']
+          :~  ['location' '/apps/xchange/myads']
           ==
         :~
           [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
@@ -3274,6 +3478,9 @@
                             ;a(href "/apps/xchange/postad"): Post an Ad
                           ==
                           ;li
+                            ;a(href "/apps/xchange/myads"): My Ads
+                          ==
+                          ;li
                             ;a(href "/apps/xchange/pals"): Pals
                           ==
                           ;li
@@ -3414,6 +3621,9 @@
                           ;li
                             ;a(href "/apps/xchange/postad"): Post an Ad
                           ==
+                          ;li
+                            ;a(href "/apps/xchange/myads"): My Ads
+                          == 
                           ;li
                             ;a(href "/apps/xchange/pals"): Pals
                           ==
@@ -3922,6 +4132,9 @@
                               ;a(href "/apps/xchange/postad"): Post an Ad
                             ==
                             ;li
+                              ;a(href "/apps/xchange/myads"): My Ads
+                            == 
+                            ;li
                               ;a(href "/apps/xchange/pals"): Pals
                             ==
                             ;li
@@ -4331,6 +4544,9 @@
                               ;a(href "/apps/xchange/postad"): Post an Ad
                             ==
                             ;li
+                              ;a(href "/apps/xchange/myads"): My Ads
+                            == 
+                            ;li
                               ;a(href "/apps/xchange/pals"): Pals
                             ==
                             ;li
@@ -4339,7 +4555,7 @@
                           ==
                       ==::closes left-bar
                           ;div(class "subscriptions-container")
-                              :: Left column - Incoming Subscriptions
+                              :: Left column - Subscribed to You
                               ;div(class "subscription-column")
                                 ;+  ?:  =(incoming-subs ~)
                                       ;div(class "subscription-table-wrapper")
@@ -4364,7 +4580,7 @@
                               ;div(class "subscription-table-wrapper")
                                   ;table(class "subscription-table")
                                       ;tr
-                                        ;th(colspan "2", class "subscription-header"): Incoming Subscriptions
+                                        ;th(colspan "2", class "subscription-header"): Subscribed to You
                                       ==
                                       ;tr
                                         ;th(colspan "2", class "subscription-header subscription-header-sub"): Other ships subscribing to your ship's data
@@ -4387,7 +4603,7 @@
                                 ;div.table-div(class "subscription-table-wrapper")
                                   ;table(class "subscription-table")
                                     ;tr
-                                      ;th(colspan "3", class "subscription-header"): Outgoing Subscriptions
+                                      ;th(colspan "3", class "subscription-header"): Your Subscriptions
                                     ==
                                     ;tr
                                       ;td(colspan "3", class "subscription-header"): Your ship subscribing to other ships data
@@ -4407,7 +4623,7 @@
                               ;div.table-div(class "subscription-table-wrapper")
                                 ;table(class "subscription-table")
                                   ;tr
-                                    ;th(colspan "3", class "subscription-header"): Outgoing Subscriptions
+                                    ;th(colspan "3", class "subscription-header"): Your Subscriptions
                                   == 
                                   ;tr
                                     ;td(colspan "3", class "subscription-header"): Your ship subscribing to other ships data
@@ -4520,7 +4736,10 @@
                                   ==
                                   ;li
                                     ;a(href "/apps/xchange/postad"): Post an Ad
-                                  ==                       
+                                  ==
+                                  ;li
+                                    ;a(href "/apps/xchange/myads"): My Ads
+                                  ==                        
                                   ;li
                                     ;a(href "/apps/xchange/pals"): Pals
                                   ==
@@ -4609,98 +4828,126 @@
           ^~
           %-  trip
           '''
-            document.addEventListener('DOMContentLoaded', function() {
-              const maxSize = 4 * 1024 * 1024;
-              const fileInputs = document.querySelectorAll('.file-input');
-              
-              // Initialize image reducer
-              const reduce = new ImageBlobReduce();
-              
-              fileInputs.forEach(function(input) {
-                input.addEventListener('change', async function(e) {
-                  const file = e.target.files[0];
-                  if (!file) return;
-                  
-                  // Only process images
-                  if (!file.type.startsWith('image/')) {
-                    alert('Please select an image file (JPEG or PNG)');
-                    e.target.value = '';
-                    return;
-                  }
-                  
+          document.addEventListener('DOMContentLoaded', function() {
+            const maxSize = 4 * 1024 * 1024;
+            const fileInputs = document.querySelectorAll('.file-input');
+            
+            // Check if image-blob-reduce library loaded successfully
+            const compressionAvailable = typeof ImageBlobReduce !== 'undefined';
+            
+            if (!compressionAvailable) {
+              console.warn('Image compression libraries not available - images will be uploaded without compression');
+            }
+            
+            fileInputs.forEach(function(input) {
+              input.addEventListener('change', async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                if (!file.type.startsWith('image/')) {
+                  alert('Please select an image file (JPEG or PNG)');
+                  e.target.value = '';
+                  return;
+                }
+                
+                // If compression available, use it
+                if (compressionAvailable) {
                   try {
-                    // Compress image to max 1200px width/height
+                    const reduce = new ImageBlobReduce();
                     const blob = await reduce.toBlob(file, { max: 1200 });
                     
-                    // Create new file from compressed blob
                     const resizedFile = new File([blob], file.name, {
                       type: blob.type,
                       lastModified: Date.now()
                     });
                     
-                    // Replace the file input with compressed version
+                    // Check compressed size
+                    if (resizedFile.size > maxSize) {
+                      alert('File ' + file.name + ' is too large even after compression. Maximum size is 4MB. Compressed file is ' + 
+                            (resizedFile.size / 1024 / 1024).toFixed(2) + 'MB');
+                      e.target.value = '';
+                      return;
+                    }
+                    
+                    // Replace file input with compressed version
                     const dataTransfer = new DataTransfer();
                     dataTransfer.items.add(resizedFile);
                     e.target.files = dataTransfer.files;
                     
-                    // Update the corresponding hidden size field
+                    // Update hidden size field
                     const sizeInput = document.getElementById(e.target.id + '-size');
                     if (sizeInput) {
                       sizeInput.value = resizedFile.size;
                     }
                     
-                    // Check if compressed file is still too large
-                    if (resizedFile.size > maxSize) {
-                      alert('File ' + file.name + ' is too large even after compression. Maximum size is 4MB. Compressed file is ' + 
-                            (resizedFile.size / 1024 / 1024).toFixed(2) + 'MB');
-                      e.target.value = '';
-                      if (sizeInput) sizeInput.value = '';
-                    } else {
-                      // Show compression results
-                      const originalKB = (file.size / 1024).toFixed(0);
-                      const compressedKB = (resizedFile.size / 1024).toFixed(0);
-                      const savings = ((1 - resizedFile.size / file.size) * 100).toFixed(0);
-                      console.log('Compressed ' + file.name + ': ' + originalKB + 'KB → ' + compressedKB + 'KB (' + savings + '% reduction)');
-                    }
+                    // Log compression results
+                    const originalKB = (file.size / 1024).toFixed(0);
+                    const compressedKB = (resizedFile.size / 1024).toFixed(0);
+                    const savings = ((1 - resizedFile.size / file.size) * 100).toFixed(0);
+                    console.log('Compressed ' + file.name + ': ' + originalKB + 'KB → ' + compressedKB + 'KB (' + savings + '% reduction)');
+                    
                   } catch (err) {
                     console.error('Image compression failed:', err);
-                    alert('Failed to process image. Please try a different file.');
-                    e.target.value = '';
+                    console.warn('Falling back to uncompressed upload');
+                    // Fall through to size check below
+                    checkUncompressedSize(file, e.target);
                   }
-                });
+                } else {
+                  // No compression available - just check size
+                  checkUncompressedSize(file, e.target);
+                }
               });
-              
-              // Submit validation for postad form
-              const postAdForm = document.querySelector('form[action="/apps/xchange/postad"]');
-              if (postAdForm) {
-                postAdForm.addEventListener('submit', function(e) {
-                  for (let input of fileInputs) {
-                    const file = input.files[0];
-                    if (file && file.size > maxSize) {
-                      e.preventDefault();
-                      alert('Please remove files larger than 2MB before submitting');
-                      return false;
-                    }
-                  }
-                });
-              }
-              
-              // Submit validation for manage/update form
-              const manageForm = document.querySelector('form[action*="/manage/"]');
-              if (manageForm) {
-                manageForm.addEventListener('submit', function(e) {
-                  for (let input of fileInputs) {
-                    const file = input.files[0];
-                    if (file && file.size > maxSize) {
-                      e.preventDefault();
-                      alert('Please remove files larger than 4MB before submitting');
-                      return false;
-                    }
-                  }
-                });
-              }
             });
+            
+            // Helper function to check uncompressed file size
+            function checkUncompressedSize(file, inputElement) {
+              if (file.size > maxSize) {
+                alert('File is too large. Maximum size is 4MB. This file is ' + 
+                      (file.size / 1024 / 1024).toFixed(2) + 'MB. Please resize before uploading.');
+                inputElement.value = '';
+                return false;
+              }
+              
+              const sizeInput = document.getElementById(inputElement.id + '-size');
+              if (sizeInput) {
+                sizeInput.value = file.size;
+              }
+              
+              console.log('Uploading uncompressed: ' + file.name + ' (' + (file.size / 1024).toFixed(0) + 'KB)');
+              return true;
+            }
+            
+            // Form submission validation
+            const postAdForm = document.querySelector('form[action="/apps/xchange/postad"]');
+            if (postAdForm) {
+              postAdForm.addEventListener('submit', function(e) {
+                for (let input of fileInputs) {
+                  const file = input.files[0];
+                  if (file && file.size > maxSize) {
+                    e.preventDefault();
+                    alert('Please remove files larger than 4MB before submitting');
+                    return false;
+                  }
+                }
+              });
+            }
+            
+            const manageForm = document.querySelector('form[action*="/manage/"]');
+            if (manageForm) {
+              manageForm.addEventListener('submit', function(e) {
+                for (let input of fileInputs) {
+                  const file = input.files[0];
+                  if (file && file.size > maxSize) {
+                    e.preventDefault();
+                    alert('Please remove files larger than 4MB before submitting');
+                    return false;
+                  }
+                }
+              });
+            }
+          });
           '''
+    ::
     ++  style
             ^~
             %-  trip
