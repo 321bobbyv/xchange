@@ -2,7 +2,7 @@
   title+''
   info+'P2P Marketplace and Townsquare'
   color+0xff.ffff
-  version+[0 0 1]
+  version+[0 0 2]
   website+'https://github.com/321bobbyv/xchange'
   license+'MIT'
   image+'/apps/xchange/img/xchange-logo.png'
