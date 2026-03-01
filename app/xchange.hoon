@@ -1,32 +1,65 @@
 /-  *xchange
 /-  hark
-/+  default-agent, dbug, agentio, sigil
+/+  default-agent, dbug, agentio, sigil, server
 |%
   +$  versioned-state
       $%  [%0 state-zero]
+          [%1 state-one]
     ==
   +$  state-zero
-    $:  %0::remove
-      mywallet=@t
-      balance=@ud
-      etherscankey=@t
-      listings=(map id=@t advert)
-      listings1=(map id=@t advert1)
-      mylistings=(map id=@t advert)
-      mylistings1=(map id=@t advert1)
-      alerts=(map alert-id=@t alert)
-      my-favorites=(map ship=@p comment=@t)
-      my-avoids=(map ship=@p my-avoid)
-      alert-results=(map ad-id=@t alert-result)
-      message-pals=@t
-      message-alerts=@t
-      message-myads=@t
-      message-settings=@t
-      sort-state=[column=@t ascending=?]
-      xchange-ships=(set @p)
-      maxpic-size=@ud
-      maxad-timeout=@dr
-      maxapp-size=@ud
+    $:  %0
+        mywallet=@t
+        balance=@ud
+        etherscankey=@t
+        listings=(map id=@t advert)
+        listings1=(map id=@t advert1)
+        mylistings=(map id=@t advert)
+        mylistings1=(map id=@t advert1)
+        alerts=(map alert-id=@t alert)
+        my-favorites=(map ship=@p comment=@t)
+        my-avoids=(map ship=@p my-avoid)
+        alert-results=(map ad-id=@t alert-result)
+        message-pals=@t
+        message-alerts=@t
+        message-myads=@t
+        message-settings=@t
+        sort-state=[column=@t ascending=?]
+        xchange-ships=(set @p)
+        maxpic-size=@ud
+        maxad-timeout=@dr
+        maxapp-size=@ud
+    ==
+  +$  state-one
+    $:  %1
+        mywallet=@t
+        balance=@ud
+        etherscankey=@t
+        my-wallets=(map addr sigm)
+        listings=(map id=@t advert)
+        listings1=(map id=@t advert1)
+        mylistings=(map id=@t advert)
+        mylistings1=(map id=@t advert1)
+        alerts=(map alert-id=@t alert)
+        my-favorites=(map ship=@p comment=@t)
+        my-avoids=(map ship=@p my-avoid)
+        alert-results=(map ad-id=@t alert-result)
+        message-pals=@t
+        message-alerts=@t
+        message-myads=@t
+        message-settings=@t
+        sort-state=[column=@t ascending=?]
+        xchange-ships=(set @p)
+        maxpic-size=@ud
+        maxad-timeout=@dr
+        maxapp-size=@ud
+        transfer-history=(map tx-hash=@ux transfer-record)
+        wallet-access=?
+        pending-wallet-requests=(map request-id=@t target=@p)
+        wallet-lookup-results=(map @ta [success=? data=(unit (list [addr sigm]))])
+        message-wallets=@t
+        message-pay=@t
+        pending-transactions=(map request-id=@ta pending-transaction)
+        unseen-tx=?        ::  %.y = blue dot shown, %.n = no dot
     ==
     ::
   +$  card  card:agent:gall
@@ -44,7 +77,7 @@
   ::
 --
 %-  agent:dbug
-=|  [%0 state-zero]
+=|  [%1 state-one]
 =*  state  -
 ^-  agent:gall
 ::
@@ -69,28 +102,65 @@
             [%pass /participants %agent [distribution-ship %xchange] %watch /participants]
             [%pass /xchange/timer %arvo %b %wait new-timer]
         ==
+        ::
     ++  on-save
         ^-  vase
         !>(state)
         ::
+        ::
     ++  on-load
         |=  ole=vase
-        =/  old=versioned-state  !<(versioned-state ole)
-        |-
-        ?-    -.old
-            %0
-        %-  (slog leaf+"%xchange-reloaded" ~)
-        `this(state old)
+        ^-  (quip card _this)
+        =/  old  !<(versioned-state ole)
+        ?-  -.old
+          %1
+          =/  new-state=state-one  +.old
+          `this(state [%1 new-state])
+        ::
+          %0
+          =/  old-state=state-zero  +.old
+          =/  new-state=state-one
+            :*  %1
+                mywallet.old-state
+                balance.old-state
+                etherscankey.old-state
+                ~  :: my-wallets initialized as empty map
+                listings.old-state
+                listings1.old-state
+                mylistings.old-state
+                mylistings1.old-state
+                alerts.old-state
+                my-favorites.old-state
+                my-avoids.old-state
+                alert-results.old-state
+                message-pals.old-state
+                message-alerts.old-state
+                message-myads.old-state
+                message-settings.old-state
+                sort-state.old-state
+                xchange-ships.old-state
+                maxpic-size.old-state
+                maxad-timeout.old-state
+                maxapp-size.old-state
+                ~  :: transfer-history initialized as empty map
+                %.n
+                ~
+                ~
+                '' ::message-wallets initialized as empty text
+                '' ::message-pay initialized as empty text  
+                ~  :: pending-transactions initialized as empty map 
+                %.n             
+            ==
+          %-  (slog leaf+"%xchange: migrated from state-0 to state-1" ~)
+          `this(state [%1 new-state])
         ==
         ::
     ++  on-poke
       |=  [=mark =vase]
-      ::~&  [%bowl bowl]
-      ?>  =(our.bowl src.bowl)
-      ^-  (quip card _this)
-      ?>  =(our.bowl src.bowl)
+      ::~&  [%on-poke-received mark src.bowl]
       ?+    mark  (on-poke:def mark vase)
-          %xchange-act
+      %xchange-act
+        ?>  =(our.bowl src.bowl)  :: Internal actions require same-ship
         =/  vaz=act  !<(act vase)
         =^  cards  state
           ?-  -.vaz
@@ -105,17 +175,69 @@
             %del-fav                (del-favorite:gilt:is +.vaz)
             %add-avoid               (add-avoid:gilt:is +.vaz)
             %del-avoid               (del-avoid:gilt:is +.vaz)
+            %link-wallet             (link-wallet:gilt:is +.vaz)
+            %unlink-wallet           (unlink-wallet:gilt:is +.vaz)
+            %verify-ad-wallet        (verify-ad-wallet:gilt:is +.vaz)
+            %transfer-history        (transfer-history:gilt:is +.vaz)
           ==
         [cards this]
-        %subscribe-request
-          =/  target-ship  !<(ship vase)
-          :_  this
-          :~  [%pass /ad-updates/(scot %p target-ship) %agent [target-ship %xchange] %watch /ad-updates]
-          ==
-          ::
-        %handle-http-request
+    
+    %subscribe-request
+      ?>  =(our.bowl src.bowl)  :: Only we can request subscriptions
+      =/  target-ship  !<(ship vase)
+      :_  this
+      :~  [%pass /ad-updates/(scot %p target-ship) %agent [target-ship %xchange] %watch /ad-updates]
+      ==
+    
+    :: Handle incoming transfer notifications from other ships
+    :: Accept from ANY ship - no auth check
+    %xchange-transfer
+      =/  transfer-data  !<(xchange-transfer vase)
+      ::~&  [%transfer-data-decoded transfer-data]
+      
+      :: Verify this transfer is for one of our wallets
+      =/  is-for-us=?
+        ?~  to-addr.rec.transfer-data
+          ::~&  [%no-to-addr]
+          %.n
+        =/  wallet-list  ~(tap by my-wallets.state)
+        |-
+        ?~  wallet-list  %.n
+        ?:  =(u.to-addr.rec.transfer-data -.i.wallet-list)
+          ::~&  [%matched-wallet -.i.wallet-list]
+          %.y
+        $(wallet-list t.wallet-list)
+      
+      ?.  is-for-us
+        ::~&  [%transfer-not-for-us]
+        `this  :: Not for us, silently ignore
+      
+      :: Generate unique request ID
+      =/  request-id=@ta
+        %-  crip
+        "{(scow %ux tx-hash.transfer-data)}_{(scow %da now.bowl)}"
+      
+      :: Store as pending
+      =/  pending-entry=pending-transaction
+        :*  transfer=transfer-data
+            from-ship=src.bowl
+            received-at=now.bowl
+        ==
+      
+      =/  new-state
+        state(pending-transactions (~(put by pending-transactions.state) request-id pending-entry))
+      
+      :: Make HTTP request to verify transaction hash exists
+      =/  verify-card  (make-eth-rpc-request tx-hash.transfer-data request-id)
+      
+      ::~&  [%verifying-tx-hash tx-hash.transfer-data from-ship=src.bowl]
+      :_  this(state new-state)
+      ~[verify-card]
+    %handle-http-request
+        ?>  =(our.bowl src.bowl)  :: HTTP must be from us
         =/  req  !<  (pair @ta inbound-request:eyre)  vase
-        ::~&  [%req req]
+        =/  reqsort  request.q.req
+        ::~&  [%reqsort reqsort]
         =/  eny  (crip (a-co:co eny.bowl))
         =/  purl  (rash url.request.q.req ;~(plug apat:de-purl:html yque:de-purl:html))
         ::~&  [%purl purl]
@@ -144,12 +266,12 @@
             =/  purl-pair-simple  [ad-id img-num]
           [(serve-listing-image req purl-pair-simple now.bowl our.bowl eny listings1.state mylistings1.state) this]
         ?:  |(?=(~ +.q.purl) ?=([%xchange ~] +.q.purl) &(=(url.request.q.req '/apps/xchange') =(method.request.q.req %'GET')))
-            =/  result  (xchange-main req our.bowl eny listings.state listings1.state my-avoids.state my-favorites.state sort-state.state)
+            =/  result  (xchange-main req our.bowl eny listings.state listings1.state my-avoids.state my-favorites.state transfer-history.state sort-state.state)
             =/  cards  -.result
             =/  new-sort-state  +.result
             [cards this(sort-state.state new-sort-state)]
         ?:  ?=([%xchange %type *] +.q.purl)
-            =/  result  (xchange-main req our.bowl eny listings.state listings1.state my-avoids.state my-favorites.state sort-state.state)
+            =/  result  (xchange-main req our.bowl eny listings.state listings1.state my-avoids.state my-favorites.state transfer-history.state sort-state.state)
             =/  cards  -.result
             =/  new-sort-state  +.result
             [cards this(sort-state.state new-sort-state)]
@@ -158,7 +280,7 @@
             =/  cards  (hide-listing-webpage req our.bowl eny listings.state)
             [cards this(state new-state)]
         ?:  &(=(url.request.q.req '/apps/xchange/alert') =(method.request.q.req %'GET'))
-          [(get-alert req our.bowl eny alerts.state listings1.state) this]
+          [(get-alert req our.bowl eny alerts.state listings1.state transfer-history.state) this]
         ?:  &(=(url.request.q.req '/apps/xchange/alert') =(method.request.q.req %'POST'))
           =/  new-state  (post-alert-state req now.bowl our.bowl eny alerts.state alert-results.state listings.state listings1.state)
           =/  cards  (post-alert-webpage req our.bowl eny alerts.state)
@@ -178,12 +300,12 @@
             [fact-card web-cards]
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'GET'))
           =/  cards
-              (get-my-new-ads req our.bowl eny mylistings.state mylistings1.state message-myads.state sort-state.state)
+              (get-my-new-ads req our.bowl eny mylistings.state mylistings1.state message-myads.state transfer-history.state sort-state.state)
           [cards this(state state(message-myads ''))]
           ::posting new add on post ad webpage
         ?:  &(=(url.request.q.req '/apps/xchange/myads') =(method.request.q.req %'GET'))
           =/  cards
-              (get-myad req our.bowl eny mylistings.state mylistings1.state message-myads.state sort-state.state)
+              (get-myad req our.bowl eny mylistings.state mylistings1.state message-myads.state transfer-history.state sort-state.state)
           [cards this(state state(message-myads ''))]
         ?:  &(=(url.request.q.req '/apps/xchange/postad') =(method.request.q.req %'POST'))
           ::~&  %post-ad
@@ -213,7 +335,7 @@
           [(get-manage-alert req purl-pair now.bowl our.bowl eny alerts.state alert-results.state listings1.state) this]
           ::
         ?:  &(?=([%xchange %view-alert *] +.q.purl) =(method.request.q.req %'GET'))
-          [(get-view-alert req purl-pair now.bowl our.bowl eny alerts.state alert-results listings1.state) this]  
+          [(get-view-alert req purl-pair now.bowl our.bowl eny alerts.state alert-results listings1.state transfer-history.state) this]  
           :: update current ad
         ?:  &(?=([%xchange %manage-myad *] +.q.purl) =(method.request.q.req %'POST'))
           ::~>  %bout
@@ -240,11 +362,11 @@
           =/  cards  (post-alert-webpage req our.bowl eny alerts.state)
           [cards this(state new-state)]
         ?:  &(?=([%xchange %view-ad *] +.q.purl) =(method.request.q.req %'GET'))
-          [(get-view-ad req purl-pair now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state) this]
+          [(get-view-ad req purl-pair now.bowl our.bowl eny mylistings.state mylistings1.state listings.state listings1.state transfer-history.state) this]
         ::pals routing and rendering
         ?:  &(=(url.request.q.req '/apps/xchange/pals') =(method.request.q.req %'GET'))
           =/  cards
-              (get-pals req our.bowl eny my-avoids.state my-favorites.state message-pals.state)
+              (get-pals req our.bowl eny my-avoids.state my-favorites.state message-pals.state transfer-history.state)
           [cards this(state state(message-pals ''))]
         :: pals favorites updates
         ?:  &(=(url.request.q.req '/apps/xchange/add-favorite') =(method.request.q.req %'POST'))
@@ -279,6 +401,11 @@
         ::  Sigil endpoint
         ?:  &(=(method.request.q.req %'GET') ?=([%xchange %sigil *] +.q.purl))
           [(serve-sigil req bowl eny) this]
+        :: Serve JavaScript module for wallet  
+        ?:  ?&  =(method.request.q.req %'GET')
+            ?=([%xchange %js %xchange-wallet *] +.q.purl)
+            ==
+        [(serve-wallet-js:static req our.bowl now.bowl) this]
           ::settings page
         ?:  &(=(url.request.q.req '/apps/xchange/settings') =(method.request.q.req %'GET'))
         [(get-settings req our.bowl maxpic-size.state maxad-timeout.state maxapp-size.state message-settings.state alerts.state alert-results.state mylistings1.state listings1.state) this(state state(message-settings ''))]
@@ -295,11 +422,87 @@
         [cards this(state new-state(listings1 final-listings, alert-results cleaned-alert-results))]
         ::
         ?:  &(=(url.request.q.req '/apps/xchange/subscriptions') =(method.request.q.req %'GET'))
-          [(get-subscriptions req our.bowl bowl alerts.state alert-results.state mylistings1.state listings1.state) this]
+          [(get-subscriptions req our.bowl bowl alerts.state alert-results.state mylistings1.state listings1.state transfer-history.state) this]
         ::
-      ?:  &(?=([%xchange %search *] +.q.purl) =(method.request.q.req %'GET'))      
-          [(get-search req -.+.purl our.bowl alerts.state listings1.state my-avoids.state my-favorites.state sort-state.state) this]
-          
+        ?:  &(?=([%xchange %search *] +.q.purl) =(method.request.q.req %'GET'))      
+            [(get-search req -.+.purl our.bowl alerts.state listings1.state my-avoids.state my-favorites.state sort-state.state) this]
+
+          :: Wallet management page (GET)
+        ?:  &(=(url.request.q.req '/apps/xchange/wallet') =(method.request.q.req %'GET'))
+          =/  cards
+          (get-wallet req our.bowl eny my-wallets.state message-wallets.state)
+          [cards this(state state(message-wallets ''))]
+        ::
+        ?:  &(=(url.request.q.req '/apps/xchange/link-wallet') =(method.request.q.req %'POST'))
+          =/  new-state  (link-wallet-state req now.bowl our.bowl eny)
+          =/  cards  (link-wallet-webpage req our.bowl eny)
+          [cards this(state new-state)]
+          ::
+        ?:  &(=(url.request.q.req '/apps/xchange/unlink-wallet') =(method.request.q.req %'POST'))
+          =/  new-state  (unlink-wallet-state req our.bowl)
+          =/  cards  (unlink-wallet-webpage req our.bowl eny)
+          [cards this(state new-state)]
+          ::
+        ?:  &(=(url.request.q.req '/apps/xchange/edit-wallet-nickname') =(method.request.q.req %'POST'))
+          =/  new-state  (edit-wallet-nickname-state req our.bowl)
+          =/  cards  (redirect-to req '/apps/xchange/wallet')
+          [cards this(state new-state)]
+        ::
+        ?:  &(=(url.request.q.req '/apps/xchange/pay-transfer') =(method.request.q.req %'GET'))
+          [(get-pay-transfer req our.bowl eny my-wallets.state transfer-history.state pending-transactions.state) this] 
+        ::
+                ::
+        ?:  &(=(url.request.q.req '/apps/xchange/pay-transfer') =(method.request.q.req %'POST'))
+            =/  [cards=(list card) new-state=_state]
+              (handle-wallet-lookup req our.bowl now.bowl state)
+            [cards this(state new-state)] 
+            ::
+         ?:  &(=(url.request.q.req '/apps/xchange/unlink-wallet') =(method.request.q.req %'POST'))
+          =/  new-state  (unlink-wallet-state req our.bowl)
+          =/  cards  (unlink-wallet-webpage req our.bowl eny)
+          [cards this(state new-state)]
+        ::
+        :: Handle wallet lookup API (GET)
+        ?:  &(=(url.request.q.req '/apps/xchange/get-ship-wallet') =(method.request.q.req %'POST'))
+          [(get-ship-wallet-handler req our.bowl now.bowl) this]
+        ::
+        ?:  &(=(url.request.q.req '/apps/xchange/toggle-transfer') =(method.request.q.req %'POST'))
+            =/  new-state  (toggle-transfer-state req our.bowl)
+            =/  cards  (toggle-transfer-webpage req our.bowl eny)
+            [cards this(state new-state)]
+            ::
+        ?:  &(=(url.request.q.req '/apps/xchange/toggle-primary') =(method.request.q.req %'POST'))
+            =/  new-state  (toggle-primary-state req our.bowl)
+            =/  cards  (toggle-primary-webpage req our.bowl eny)
+            [cards this(state new-state)]
+        ::
+        :: Serve xchange-wallet.js
+        ?:  &(=(url.request.q.req '/apps/xchange/js/xchange-wallet.js') =(method.request.q.req %'GET'))
+          [(serve-js-file req our.bowl now.bowl 'xchange-wallet') this]
+        ::
+        :: Serve xchange-pay-transfer.js  
+        ?:  &(=(url.request.q.req '/apps/xchange/js/xchange-pay-transfer.js') =(method.request.q.req %'GET'))
+          [(serve-js-file req our.bowl now.bowl 'xchange-pay-transfer') this]
+        ::
+        ?:  &(?=([%xchange %wallet-status *] +.q.purl) =(method.request.q.req %'GET'))
+          =/  [cards=(list card) new-state=_state]
+            (get-wallet-status req our.bowl state)
+          [cards this(state new-state)]
+        ::
+        ?:  &(=(url.request.q.req '/apps/xchange/record-ship-transfer') =(method.request.q.req %'POST'))
+          =/  [cards=(list card) new-state=_state]
+            (handle-ship-transactions req our.bowl now.bowl state)
+          [cards this(state new-state)]
+        ::
+         ?:  &(=(url.request.q.req '/apps/xchange/transactions') =(method.request.q.req %'GET'))
+            =/  cards
+            (get-transaction req our.bowl eny my-wallets.state transfer-history.state unseen-tx.state)
+            [cards this(state state(unseen-tx %.n))]
+        ::
+        ?:  &(=(url.request.q.req '/apps/xchange/update-memo') =(method.request.q.req %'POST'))
+          =/  new-state  (update-memo-state req our.bowl transfer-history.state)
+          =/  cards  (post-transactions-webpage req our.bowl)
+          [cards this(state new-state)]
         ::default case if there is no matches
         =/  =response-header:http
             :-  404
@@ -316,157 +519,233 @@
     ++  on-watch
         |=  =path
         ^-  (quip card _this)
-        ?+    path
-          (on-watch:def path)
-          [%http-response *]
+        ?+    path  (on-watch:def path)
+            [%http-response *]
           `this
-          [%participants *]
-              :: If this ship is the distribution ship, serve participant list
-              ?:  =(our.bowl ~tabdyl)
-          =/  new-xchange-ships  (~(put in xchange-ships) src.bowl)
-          =/  participants  `distribution-action`[%participants new-xchange-ships]
-          =/  add-participant  `distribution-action`[%add-participant src.bowl]
-          =/  sub-to-new-ship  [%pass /ad-updates %agent [src.bowl %xchange] %watch /ad-updates]
-          :_  this(xchange-ships new-xchange-ships)
-          :~  [%give %fact ~ %xchange-distribution !>(participants)]      
-              [%give %fact [/participants ~] %xchange-distribution !>(add-participant)]  
-              sub-to-new-ship
+          
+            [%participants *]
+          :: If this ship is the distribution ship, serve participant list
+          ?:  =(our.bowl ~tabdyl)
+            =/  new-xchange-ships  (~(put in xchange-ships) src.bowl)
+            =/  participants  `distribution-action`[%participants new-xchange-ships]
+            =/  add-participant  `distribution-action`[%add-participant src.bowl]
+            =/  sub-to-new-ship  [%pass /ad-updates %agent [src.bowl %xchange] %watch /ad-updates]
+            :_  this(xchange-ships new-xchange-ships)
+            :~  [%give %fact ~ %xchange-distribution !>(participants)]      
+                [%give %fact [/participants ~] %xchange-distribution !>(add-participant)]  
+                sub-to-new-ship
+            ==
+          (on-watch:def path)
+          
+            [%ad-updates *]
+          =/  myactive-listings
+            %-  malt
+            %+  turn
+              %+  skim
+                ~(tap by mylistings1)
+                |=  [key=@t value=advert1]
+                =(active.value %.y)
+              |=  [key=@t value=advert1]
+              [key value]
+          :_  this
+          :~  [%give %fact ~ %xchange-listings !>([%ad-update myactive-listings])]
           ==
-        (on-watch:def path)
-          [%ad-updates *]
-                =/  myactive-listings
-                  %-  malt
-                  %+  turn
-                    %+  skim
-                      ~(tap by mylistings1)  :: Convert `map` to a `list`
-                      |=  [key=@t value=advert1]
-                      =(active.value %.y)  :: Keep only listings where `active=%.y`
-                    |=  [key=@t value=advert1]
-                    [key value]  :: Prepare key-value pairs for malt
-                :_  this
-                :~  [%give %fact ~ %xchange-listings !>([%ad-update myactive-listings])]
-                ==
+          
+            [%wallet-request ~]
+          ::~&  [%wallet-request-received 'Ship requesting wallet info']
+          ::  Get primary wallets that allow transfers
+          =/  primary-wallets
+              %+  skim
+                ~(tap by my-wallets.state)
+                |=  [key=addr value=sigm]
+                &(=(primary.value %.y) =(transfer-ok.value %.y))
+          ::~&  [%sending-wallets (lent primary-wallets)]
+          ::~&  [%wallet-data primary-wallets]
+          ::  Send wallet data and immediately kick (one-time response)
+          :_  this
+          :~  [%give %fact ~[path] %xchange-wallet-list !>(primary-wallets)]
+              [%give %kick ~[path] ~]
+          ==
         ==
 
     ++  on-leave  on-leave:def
-    ++  on-peek   on-peek:def
+    ++  on-peek  on-peek:def      
     ++  on-agent
         |=  [=wire =sign:agent:gall]
+        ::~&  [%on-agent-wire wire]
         ^-  (quip card _this)
         ?+  wire  (on-agent:def wire sign)
-        [%participants *] 
-        ::~&  ['%xchange: [participants wire triggered, sign type:' -.sign 'from:' src.bowl]     
-          ?+  -.sign  (on-agent:def wire sign)
-            %fact
-              =/  cage-sign  !<(distribution-action q.cage.sign)
-              =/  distribution-ship  ~tabdyl
-              =/  myactive-listings  (get-active-listings mylistings1.state)
-                  ?-  -.cage-sign
-                    %participants
-                      :: Got list of participants, subscribe to all of them.
-                      ::~&  ['%xchange: received participants list with' ~(wyt in ships.cage-sign) 'ships']
-                      =/  current-subs  
-                        %-  ~(gas in *(set @p))
-                        %+  turn  ~(tap by sup.bowl)
-                        |=  [=duct [ship=@p =path]]
-                        ?:  =(/ad-updates path)  ship
-                        *@p
-                      =/  new-ships  (~(dif in ships.cage-sign) current-subs)
-                      ::~&  ['%xchange: subscribing to' ~(wyt in new-ships) 'new ships:' ~(tap in new-ships)]
-                      =/  sub-cards=(list card)
-                          %+  turn  
-                            %+  skim  ~(tap in new-ships)
-                            |=(ship=@p !=(ship our.bowl))
-                          |=  ship=@p
-                          [%pass /ad-updates %agent [ship %xchange] %watch /ad-updates]
-                        :_  this(xchange-ships (~(uni in xchange-ships) ships.cage-sign))
-                        ::~&  [%sub-cards sub-cards]
-                        sub-cards
-                    %add-participant
-                      :: New participant added, subscribe to them and send them my active ads.
-                      ?:  (~(has in xchange-ships) ship.cage-sign)
-                        [~ this]  :: Already subscribed
-                      :_  this(xchange-ships (~(put in xchange-ships) ship.cage-sign))
-                      :~  [%pass /ad-updates %agent [ship.cage-sign %xchange] %watch /ad-updates]
-                          [%give %fact ~[/ad-updates] %xchange-listings !>([%ad-update myactive-listings])]
-                      ==            
-                    %remove-participant
-                      :: Participant removed, unsubscribe from them
-                      ?:  !(~(has in xchange-ships) ship.cage-sign)
-                        [~ this]  :: Not subscribed anyway
-                      :_  this(xchange-ships (~(del in xchange-ships) ship.cage-sign))
-                      :~  [%pass /ad-updates %agent [ship.cage-sign %xchange] %leave ~]
-                      ==
-                  ==
-            %kick
-              :: Subscription was terminated, set a timer for 10 minutes to resubscribe
-              =/  now  now.bowl
-              =/  resub-time  (add now ~m10)  :: current time + 10 minutes
-              :_  this
-              :~  [%pass /xchange/resub-participants %arvo %b %wait resub-time]
-              ==
+          [%participants *]     
+            ?+  -.sign  (on-agent:def wire sign)
+              %fact
+                =/  cage-sign  !<(distribution-action q.cage.sign)
+                =/  distribution-ship  ~tabdyl
+                =/  myactive-listings  (get-active-listings mylistings1.state)
+                    ?-  -.cage-sign
+                      %participants
+                        :: Got list of participants, subscribe to all of them.
+                        ::~&  ['%xchange: received participants list with' ~(wyt in ships.cage-sign) 'ships']
+                        =/  current-subs  
+                          %-  ~(gas in *(set @p))
+                          %+  turn  ~(tap by sup.bowl)
+                          |=  [=duct [ship=@p =path]]
+                          ?:  =(/ad-updates path)  ship
+                          *@p
+                        =/  new-ships  (~(dif in ships.cage-sign) current-subs)
+                        ::~&  ['%xchange: subscribing to' ~(wyt in new-ships) 'new ships:' ~(tap in new-ships)]
+                        =/  sub-cards=(list card)
+                            %+  turn  
+                              %+  skim  ~(tap in new-ships)
+                              |=(ship=@p !=(ship our.bowl))
+                            |=  ship=@p
+                            [%pass /ad-updates %agent [ship %xchange] %watch /ad-updates]
+                          :_  this(xchange-ships (~(uni in xchange-ships) ships.cage-sign))
+                          ::~&  [%sub-cards sub-cards]
+                          sub-cards
+                      %add-participant
+                        :: New participant added, subscribe to them and send them my active ads.
+                        ?:  (~(has in xchange-ships) ship.cage-sign)
+                          [~ this]  :: Already subscribed
+                        :_  this(xchange-ships (~(put in xchange-ships) ship.cage-sign))
+                        :~  [%pass /ad-updates %agent [ship.cage-sign %xchange] %watch /ad-updates]
+                            [%give %fact ~[/ad-updates] %xchange-listings !>([%ad-update myactive-listings])]
+                        ==            
+                      %remove-participant
+                        :: Participant removed, unsubscribe from them
+                        ?:  !(~(has in xchange-ships) ship.cage-sign)
+                          [~ this]  :: Not subscribed anyway
+                        :_  this(xchange-ships (~(del in xchange-ships) ship.cage-sign))
+                        :~  [%pass /ad-updates %agent [ship.cage-sign %xchange] %leave ~]
+                        ==
+                    ==
+              %kick
+                :: Subscription was terminated, set a timer for 10 minutes to resubscribe
+                =/  now  now.bowl
+                =/  resub-time  (add now ~m10)  :: current time + 10 minutes
+                :_  this
+                :~  [%pass /xchange/resub-participants %arvo %b %wait resub-time]
+                ==
 
-          ==
-          ::
-          [%ad-updates *] 
-          ::~&  ['%xchange: [ad-updates wire triggered, sign type:' -.sign 'from:' src.bowl]    
-              ?+  -.sign  (on-agent:def wire sign)
-                %fact
-                  =/  cage-sign  !<(action1 q.cage.sign)
-                  ?-  -.cage-sign
-                    %ad-update
-                      =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
-                          (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
-                      =/  new-listings  (~(uni by cleaned-listings) listings1.cage-sign)
-                      =/  new-alert-results  (alert-matches alerts new-listings)
-                      ?:  (gth ~(wyt by new-alert-results) ~(wyt by alert-results))
-                        :: CASE: we have more alert results now than before
-                        =/  new-count  `@ud`(sub ~(wyt by new-alert-results) ~(wyt by alert-results))
-                        =/  msg  (crip (weld "Xchange App: There are " (weld (scow %ud new-count) " new matche(s)!")))
-                        =/  hark-card  (send-hark our.bowl msg now.bowl `@uvH`eny.bowl)
-                        :_  this(listings1 new-listings, alert-results new-alert-results)
-                        ~[hark-card]
-                      :: CASE: no new alert results
-                      [~ this(listings1 new-listings, alert-results new-alert-results)]
-                    %delete
-                    ::~&  [%delete-case-triggered id.cage-sign]  :: Add this
-                    ::~&  [%id-exists-in-listings (~(has by listings1) id.cage-sign)]
-                      =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
-                          (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
-                      ::~&  [%cleaned-listings-count ~(wyt by cleaned-listings)]
-                      ::~&  [%listings1-before-delete ~(wyt by listings1)]
-                      =/  new-listings  (~(del by cleaned-listings) id.cage-sign)
-                      ::~&  [%listings1-after-delete ~(wyt by new-listings)]
-                      =/  new-alert-results  (alert-matches alerts new-listings)
-                      [~ this(listings1 new-listings, alert-results new-alert-results, alert-results cleaned-alert-results)]
-                  ==
-                  %kick
-                    =/  resub-time  (add now.bowl ~m10)
-                    =/  kicked-ship  (scot %p src.bowl)
-                    :_  this
-                    :~  [%pass /xchange/resub-ad-updates/[kicked-ship] %arvo %b %wait resub-time]
+            ==
+            ::
+          [%ad-updates *]  
+                ?+  -.sign  (on-agent:def wire sign)
+                  %fact
+                    =/  cage-sign  !<(action1 q.cage.sign)
+                    ?-  -.cage-sign
+                      %ad-update
+                        =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
+                            (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
+                        =/  new-listings  (~(uni by cleaned-listings) listings1.cage-sign)
+                        =/  new-alert-results  (alert-matches alerts new-listings)
+                        ?:  (gth ~(wyt by new-alert-results) ~(wyt by alert-results))
+                          :: CASE: we have more alert results now than before
+                          =/  new-count  `@ud`(sub ~(wyt by new-alert-results) ~(wyt by alert-results))
+                          =/  msg  (crip (weld "Xchange App: There are " (weld (scow %ud new-count) " new matche(s)!")))
+                          =/  hark-card  (send-hark our.bowl msg now.bowl `@uvH`eny.bowl)
+                          :_  this(listings1 new-listings, alert-results new-alert-results)
+                          ~[hark-card]
+                        :: CASE: no new alert results
+                        [~ this(listings1 new-listings, alert-results new-alert-results)]
+                      %delete
+                      ::~&  [%delete-case-triggered id.cage-sign]  :: Add this
+                      ::~&  [%id-exists-in-listings (~(has by listings1) id.cage-sign)]
+                        =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
+                            (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
+                        ::~&  [%cleaned-listings-count ~(wyt by cleaned-listings)]
+                        ::~&  [%listings1-before-delete ~(wyt by listings1)]
+                        =/  new-listings  (~(del by cleaned-listings) id.cage-sign)
+                        ::~&  [%listings1-after-delete ~(wyt by new-listings)]
+                        =/  new-alert-results  (alert-matches alerts new-listings)
+                        [~ this(listings1 new-listings, alert-results new-alert-results, alert-results cleaned-alert-results)]
+                    ==
+                    %kick
+                      =/  resub-time  (add now.bowl ~m10)
+                      =/  kicked-ship  (scot %p src.bowl)
+                      :_  this
+                      :~  [%pass /xchange/resub-ad-updates/[kicked-ship] %arvo %b %wait resub-time]
+                      ==
+                ==
+            [%wallet-lookup @ @ ~]
+                ?+  -.sign  
+                  ::~&  [%unexpected-sign-on-wallet-lookup -.sign]
+                  `this
+                  
+                  %fact
+                    =/  target-ship  (slav %p i.t.wire)
+                    =/  request-id  i.t.t.wire  :: This is already a @t (from scot %da)
+                    ::~&  [%fact-received-for-request request-id]
+                    ::~&  [%fact-mark p.cage.sign]
+                    
+                    ?+  p.cage.sign  
+                      ::~&  [%unexpected-mark p.cage.sign]
+                      `this
+                      
+                      %xchange-wallet-list
+                        =/  wallet-list  !<((list [addr sigm]) q.cage.sign)
+                        ::~&  [%wallet-list-received wallet-list]
+                        
+                        ::  Convert to the expected response format
+                        =/  response  
+                          ?~  wallet-list
+                            [success=%.n data=~]
+                          [success=%.y data=`wallet-list]
+                        
+                        ::~&  [%wallet-response response]
+                        
+                        ::  Store the result in wallet-lookup-results
+                        =/  new-wallet-lookup-results  
+                          (~(put by *(map @t [success=? data=(unit (list [addr sigm]))])) request-id response)
+                        
+                        ::~&  [%storing-result-in-map request-id]
+                        ::~&  [%new-map new-wallet-lookup-results]
+                        
+                        ::  Delete the pending request using request-id
+                        =/  new-pending-requests  
+                          (~(del by pending-wallet-requests.state) request-id)
+                        
+                        `this(state state(wallet-lookup-results new-wallet-lookup-results, pending-wallet-requests new-pending-requests))
+                    ==
+                
+                    %kick
+                      ::~&  [%kicked-from-wallet-lookup-subscription]
+                      `this
+                    ==
+                  [%transfer-notify ~]
+                    ?+  -.sign  (on-agent:def wire sign)
+                      %poke-ack
+                        ?~  p.sign
+                          :: Success - transfer notification sent successfully
+                          ::~&  [%transfer-notification-sent-successfully]
+                          `this
+                        :: Error - transfer notification failed
+                        ::~&  [%transfer-notification-failed u.p.sign]
+                        `this
+                      %kick
+                        :: Shouldn't happen for a poke, but handle it
+                        ::~&  [%transfer-notify-wire-kicked]
+                        `this
                     ==
               ==
-            ==
     ++  on-arvo
         |=  [=wire sign=sign-arvo]
         ^-  (quip card _this)
         ?+    wire  (on-arvo:def wire sign)
             [%bind-url ~]
-          ?+    sign  (on-arvo:def wire sign)
-              [%eyre %bound *]
-              ::~&  [%eyre-bound binding.sign]
-              `this
-          ==
+              ?+    sign  (on-arvo:def wire sign)
+                  [%eyre %bound *]
+                  ::~&  [%eyre-bound binding.sign]
+                  `this
+              ==
             [%xchange %timer ~]
-            ::~&  [%timer-fired now.bowl]
-            =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
-                (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
-            =/  new-timer  (add now.bowl ~h1)
-            ::~&  [%new-timer new-timer]
-            :_  this(listings1 cleaned-listings, alert-results cleaned-alert-results)
-            :~  [%pass /xchange/timer %arvo %b %wait new-timer]
-            ==
+              ::~&  [%timer-fired now.bowl]
+              =/  [cleaned-listings=_listings1.state cleaned-alert-results=_alert-results.state]
+                  (ad-manager now.bowl our.bowl listings1.state alert-results.state maxad-timeout.state maxapp-size.state)
+              =/  new-timer  (add now.bowl ~h1)
+              ::~&  [%new-timer new-timer]
+              :_  this(listings1 cleaned-listings, alert-results cleaned-alert-results)
+              :~  [%pass /xchange/timer %arvo %b %wait new-timer]
+              ==
             [%xchange %resub-participants ~]
               :: Resubscribe to the distribution ship (~tabdyl) after delay
               =/  distribution-ship  ~tabdyl
@@ -481,8 +760,160 @@
               :_  this
               :~  [%pass /ad-updates %agent [kicked-ship %xchange] %watch /ad-updates]
               ==
-        ==
+            [%eth-verify @ ~]
+              ?+  sign  (on-arvo:def wire sign)
+                [%iris %http-response %finished *]
+                  =/  request-id=@ta  i.t.wire
+                =/  response  client-response.sign
+                
+                =/  pending  (~(get by pending-transactions.state) request-id)
+                ?~  pending
+                  ::~&  [%no-pending-transaction request-id]
+                  `this
+                
+                ?~  full-file.response
+                  ::~&  [%eth-verify-no-response request-id]
+                  =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                  `this(state clean-state)
+                
+                =/  body=@t  q.data.u.full-file.response
+                ::~&  [%eth-rpc-response body]
+                ::
+                =/  json  (de:json:html body)
+                ?~  json
+                  ::~&  [%invalid-json-response body]
+                  =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                  `this(state clean-state)
+                
+                =/  tx-data  (parse-eth-transaction u.json)
+                
+                ?~  tx-data
+                  :: Transaction not found - retry or timeout
+                  =/  elapsed  (sub now.bowl received-at.u.pending)
+                  ?:  (lth elapsed ~m120)
+                    ::~&  [%transaction-pending-retrying-in-30s tx-hash=tx-hash.transfer.u.pending attempt-at=(add now.bowl ~s30)]
+                    =/  retry-time  (add now.bowl ~s30)
+                    =/  retry-card  [%pass /eth-verify-retry/[request-id] %arvo %b %wait retry-time]
+                    :_  this
+                    ~[retry-card]
+                  ::~&  [%transaction-timeout-giving-up tx-hash=tx-hash.transfer.u.pending elapsed=elapsed]
+                  =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                  `this(state clean-state)
 
+                :: tx-data exists — now branch on currency
+                =/  transfer-rec  rec.transfer.u.pending
+                  ::~&  [%erc20-input input.u.tx-data]
+                  ::~&  [%erc20-stripped (slag 2 (trip input.u.tx-data))]
+                  ::~&  [%erc20-selector (scag 8 (slag 2 (trip input.u.tx-data)))]
+                :: Check for duplicate tx hash on receiving ship
+                ?:  (~(has by transfer-history.state) tx-hash.transfer.u.pending)
+                  =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                  `this(state clean-state)
+                ?:  =('USDC' currency.transfer-rec)
+                    =/  erc20  (parse-erc20-transfer input.u.tx-data)
+                    ?~  erc20
+                      ::~&  [%usdc-calldata-parse-failed]
+                      =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                      `this(state clean-state)
+                    :: Verify from address
+                    =/  from-matches=?
+                      ?~  from-addr.transfer-rec  %.y
+                      =(u.from-addr.transfer-rec from.u.tx-data)
+                    :: Verify recipient address matches
+                    =/  to-matches=?
+                      ?~  to-addr.transfer-rec  %.y
+                      =(u.to-addr.transfer-rec to.u.erc20)
+                    :: Verify amount (USDC has 6 decimals, amount stored as raw units)
+                    =/  amount-matches=?
+                      =(amount-wei.transfer-rec amount.u.erc20)
+                    ?.  &(from-matches to-matches amount-matches)
+                      ::~&  :*  %usdc-verification-failed
+                           :: expected-from=from-addr.transfer-rec
+                           :: actual-from=from.u.tx-data
+                           :: expected-to=to-addr.transfer-rec
+                           :: actual-to=to.u.erc20
+                           :: expected-amount=amount-wei.transfer-rec
+                          ::  actual-amount=amount.u.erc20
+                        ::==
+                      =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                      `this(state clean-state)
+                    ::~&  [%usdc-transfer-verified tx-hash.transfer.u.pending]
+                    =/  new-state
+                      %=  state
+                        transfer-history  (~(put by transfer-history.state) tx-hash.transfer.u.pending transfer-rec)
+                        pending-transactions  (~(del by pending-transactions.state) request-id)
+                        unseen-tx  %.y 
+                        ==
+                      `this(state new-state)
+                
+                  :: Check 'to' address if we have one
+                  =/  to-matches=?
+                    ?~  to-addr.transfer-rec
+                      %.y  :: No to-addr stored, skip check
+                    =(u.to-addr.transfer-rec to.u.tx-data)
+                  
+                  :: Check 'from' address if we have one
+                  =/  from-matches=?
+                    ?~  from-addr.transfer-rec
+                      %.y  :: No from-addr stored, skip check
+                    =(u.from-addr.transfer-rec from.u.tx-data)
+                  ::  Amount Verification
+                   =/  amount-matches=?
+                     =(amount-wei.transfer-rec value.u.tx-data)
+                  
+                  :: All three must match, to-add, from-add, and amount
+                  ?.  &(from-matches to-matches amount-matches)
+                    ::~&  :-  %verification-failed
+                       :: :*  tx-hash=tx-hash.transfer.u.pending
+                        ::    expected-from=from-addr.transfer-rec
+                        ::    actual-from=from.u.tx-data
+                        ::    expected-to=to-addr.transfer-rec
+                        ::    actual-to=to.u.tx-data
+                        ::    expected-amount-wei=amount-wei.transfer-rec
+                        ::    actual-amount-wei=value.u.tx-data
+                        ::    expected-amount-eth=amount-eth.transfer-rec
+                        ::==
+                    :: REJECT
+                    =/  clean-state  state(pending-transactions (~(del by pending-transactions.state) request-id))
+                    `this(state clean-state)
+                  
+                  :: Transaction VERIFIED! Add to history
+                  =/  tx-hash  tx-hash.transfer.u.pending
+                  =/  new-state
+                    %=  state
+                      transfer-history  (~(put by transfer-history.state) tx-hash transfer-rec)
+                      pending-transactions  (~(del by pending-transactions.state) request-id)
+                      unseen-tx  %.y
+                    ==
+                  
+                  :: ~&  :-  %transaction-verified-and-accepted
+                       :: :*  tx-hash=tx-hash
+                       ::     from-ship=from-ship.u.pending
+                       ::     amount-eth=amount-eth.transfer-rec
+                       ::     amount-wei=amount-wei.transfer-rec
+                       :: ==
+                  
+                  `this(state new-state)
+                ==
+                [%eth-verify-retry @ ~]
+                    ?+  sign  (on-arvo:def wire sign)
+                        [%behn %wake *]
+                      =/  request-id=@ta  i.t.wire
+                      
+                      =/  pending  (~(get by pending-transactions.state) request-id)
+                      ?~  pending
+                        ::~&  [%no-pending-transaction-for-retry request-id]
+                        `this
+                      
+                      :: Retry the RPC request
+                      =/  verify-card  (make-eth-rpc-request tx-hash.transfer.u.pending request-id)
+                      ::~&  [%retrying-verification tx-hash.transfer.u.pending]
+                      
+                      :_  this
+                      ~[verify-card]
+                    ==
+              ==
+::
     ++  on-fail   on-fail:def
   --
   |_  bol=bowl:gall
@@ -583,6 +1014,38 @@
         :~  head+s+'del avoid'
             status+s+'del avoid'
         ==
+        ++  link-wallet
+        |=  [a=addr b=sigm]
+        :_  state(my-wallets (~(put by my-wallets.state) a b))  
+        =-  [%give %fact ~[/website] json+!>(`json`-)]~
+        %-  pairs:enjs:format
+        :~  head+s+'link wallet'
+            status+s+'linked wallet'
+        ==
+        ++  unlink-wallet
+        |=  a=addr
+        :_  state(my-wallets (~(del by my-wallets.state) a))  
+        =-  [%give %fact ~[/website] json+!>(`json`-)]~
+        %-  pairs:enjs:format
+        :~  head+s+'unlink wallet'
+            status+s+'unlinked wallet'
+        ==    
+        ++  verify-ad-wallet
+          |=  [a=@t b=sigm]
+          :_  state 
+          =-  [%give %fact ~[/website] json+!>(`json`-)]~
+          %-  pairs:enjs:format
+          :~  head+s+'verify wallet'
+              status+s+'verify wallet'
+        == 
+        ++  transfer-history
+          |=  [a=@ux b=transfer-record]
+          :_  state(transfer-history (~(put by transfer-history.state) a b))  
+          =-  [%give %fact ~[/website] json+!>(`json`-)]~
+          %-  pairs:enjs:format
+          :~  head+s+'transfer history'
+              status+s+'transfer history'
+          ==
       --
     ::
     ++  subscribe-to-ship
@@ -667,7 +1130,7 @@
       '<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 99.8 122.88"><defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>compare file</title><path class="cls-1" d="M67.47,118.48a4.4,4.4,0,0,1-4.38,4.4H4.4a4.38,4.38,0,0,1-3.11-1.29A4.35,4.35,0,0,1,0,118.48V41.69a4.4,4.4,0,0,1,4.4-4.4H29V25.55a2.57,2.57,0,0,1,1.87-2.48L53.55,1a2.52,2.52,0,0,1,2-.95H95.18A4.63,4.63,0,0,1,99.8,4.62V85.23a4.63,4.63,0,0,1-4.62,4.62H67.48v28.63ZM34.11,37.29h8.06a2.4,2.4,0,0,1,1.88.9L65.7,59.27a2.44,2.44,0,0,1,1.78,2.36V84.69H94.64V53.82H87.08v5.84c-.11,2.52-2,3.45-4.28,2.67a1.24,1.24,0,0,1-.36-.19C76.62,57.57,72.6,53,66.77,48.42l-.08-.07c-1.77-1.62-1.25-3.46.47-4.81L81.45,30.86a6.91,6.91,0,0,1,2.11-1.18,2.45,2.45,0,0,1,3.17,1.38,5.05,5.05,0,0,1,.35,2c0,1.81,0,3.64,0,5.45h7.56V5.13H58.12V26.05a2.59,2.59,0,0,1-2.59,2.59H34.11v8.65ZM53,9,37.53,23.48H53V9Zm-40.84,65H4.91V42.18H39.7V62.1a2.47,2.47,0,0,0,2.47,2.47h20.4q0,26.7,0,53.4H4.91V88.64h7.21V94.2c.1,2.4,1.88,3.28,4.07,2.54a1,1,0,0,0,.34-.18c5.55-4.36,9.38-8.71,14.93-13.07l.07-.07c1.7-1.53,1.19-3.29-.44-4.58L17.48,66.77a6.43,6.43,0,0,0-2-1.13,2.34,2.34,0,0,0-3,1.32,4.78,4.78,0,0,0-.32,1.9c0,1.73,0,3.47,0,5.19ZM44.61,45.89l14.7,13.77H44.61V45.89Z"/></svg>'
     ::
     ++  xchange-main
-      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t listings=(map id=@t advert) listings1=(map id=@t advert1) my-avoids=(map ship=@p my-avoid) my-favorites=(map ship=@p comment=@t) sort-state=[column=@t ascending=?]]
+      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t listings=(map id=@t advert) listings1=(map id=@t advert1) my-avoids=(map ship=@p my-avoid) my-favorites=(map ship=@p comment=@t) transfer-history=(map tx-hash=@ux transfer-record) sort-state=[column=@t ascending=?]]
       ^-  [(list card) [column=@t ascending=?]]
       =/  purl  (rash url.request.q.req ;~(plug apat:de-purl:html yque:de-purl:html))
         =/  path  q.purl
@@ -709,7 +1172,9 @@
                 ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
                 ;meta(charset "utf-8");
                 ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ::;meta(http-equiv "Content-Security-Policy", content "default-src 'self'; script-src 'self' 'unsafe-eval' https://esm.sh https://cdn.esm.sh https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.infura.io https://*.alchemy.com https://*.cloudflare-eth.com https://mainnet.infura.io https://sepolia.infura.io wss://*.infura.io wss://*.alchemy.com; img-src 'self' data:;");
                 ;style: {style}
+                ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
               ==  :: closes `;head`
             ;body
                     ;div(class "header-wrapper")
@@ -719,7 +1184,18 @@
                             ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                             ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                           ==                                   :: Closes form
-                        ==   
+                        ==
+                      :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                                ~[;span(class "nav-dot", title "New transaction");]
+                              ~
+                        ==
                       ;div.ship-box                    
                             ::;p: 
                               ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -766,7 +1242,13 @@
                         ==
                         ;li
                           ;a(href "/apps/xchange/myads"): My Ads
-                        ==                                      
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/wallet"): Wallet
+                        ==  
+                        ;li
+                          ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                        ==                                    
                         ;li
                           ;a(href "/apps/xchange/pals"): Pals
                         ==
@@ -913,17 +1395,18 @@
                 ==::closes main-content 
               ==
             ==
-            =/  =response-header:http
-                :-  200
-                :~  ['content-type' 'text/html; charset=utf-8']
-                ==
-              =/  cards
-              :~
-                [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
-                [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
-                [%give %kick [/http-response/[p.req]]~ ~]
-              ==
-               [cards updated-sort-state]
+           =/  =response-header:http
+            :-  200
+            :~  ['content-type' 'text/html; charset=utf-8']
+                ['Content-Security-Policy' 'default-src \'self\'; script-src \'self\' \'unsafe-eval\' https://esm.sh https://cdn.esm.sh https://cdnjs.cloudflare.com; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' https: wss:; img-src \'self\' data:;']
+            ==
+          =/  cards
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+          [cards updated-sort-state]
     ::
             ::
     ++  hide-allad-state
@@ -953,7 +1436,7 @@
         [%give %kick [/http-response/[p.req]]~ ~]
       ==
     ++  get-alert
-      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t alerts=(map alert-id=@t alert) listings1=(map id=@t advert1)]
+      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t alerts=(map alert-id=@t alert) listings1=(map id=@t advert1) transfer-history=(map tx-hash=@ux transfer-record)]
       ^-  (list card)
       =/  body
         %-  as-octs:mimes:html
@@ -961,11 +1444,12 @@
         %-  en-xml:html
         ;html
             ;head
-              ;title:"Xchange"
+              ;title:"Xchange-Alerts"
               ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
               ;meta(charset "utf-8");
               ;meta(name "viewport", content "width=device-width, initial-scale=1");
               ;style: {style}
+              ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
             ==::closes head
               ;body
             ;div(class "header-wrapper")
@@ -975,7 +1459,18 @@
                     ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                     ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                   ==                                   :: Closes form
-                ==   
+                == 
+                :: Wallet Connection Section
+                       ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                              ~[;span(class "nav-dot", title "New transaction");]
+                            ~
+                        ==
               ;div.ship-box                    
                     ::;p: 
                       ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -1005,6 +1500,12 @@
                 ;li
                   ;a(href "/apps/xchange/myads"): My Ads
                 == 
+                ;li
+                  ;a(href "/apps/xchange/wallet"): Wallet
+                ==
+                 ;li
+                  ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                ==
                 ;li
                   ;a(href "/apps/xchange/pals"): Pals
                 ==
@@ -1233,7 +1734,7 @@
         =/  new-alert-results  (alert-matches newalerts listings1)
         state(alerts newalerts, alert-results new-alert-results)
     ++  get-my-new-ads
-      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t sort-state=[column=@t ascending=?]]
+      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t transfer-history=(map tx-hash=@ux transfer-record) sort-state=[column=@t ascending=?]]
       ^-  (list card)
       =/  listmylistings  ~(tap by mylistings1.state)
       ::  Handle sorting from POST request
@@ -1254,6 +1755,7 @@
               ;script(src "https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js");
               ;script(src "https://cdn.jsdelivr.net/npm/image-blob-reduce@4.1.0/dist/image-blob-reduce.min.js");
               ;script: {script}
+              ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
               ;style: {style}              
             ==::closes head
               ;body
@@ -1264,7 +1766,18 @@
                     ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                     ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                   ==                                   :: Closes form
-                ==   
+                ==
+                :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                                ~[;span(class "nav-dot", title "New transaction");]
+                              ~
+                        == 
               ;div.ship-box                    
                     ::;p: 
                       ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -1295,11 +1808,17 @@
                   ;a(href "/apps/xchange/myads"): My Ads
                 == 
                 ;li
+                  ;a(href "/apps/xchange/wallet"): Wallet
+                ==
+                ;li
+                  ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                ==
+                ;li
                   ;a(href "/apps/xchange/pals"): Pals
                 ==
-                  ;li
-                  ;a(href "/apps/xchange/subscriptions"): Subscriptions
-                ==
+                ;li
+                ;a(href "/apps/xchange/subscriptions"): Subscriptions
+              ==
               ==
           ==::closes left-bar
         ::
@@ -1515,7 +2034,7 @@
       ::
     
     ++  get-myad
-      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t sort-state=[column=@t ascending=?]]
+      |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t mylistings=(map id=@t advert) mylistings1=(map id=@t advert1) message-myads=@t transfer-history=(map tx-hash=@ux transfer-record) sort-state=[column=@t ascending=?]]
       ^-  (list card)
       =/  listmylistings  ~(tap by mylistings1.state)
       ::  Handle sorting from POST request
@@ -1529,13 +2048,14 @@
         %-  en-xml:html
         ;html
             ;head
-              ;title:"Xchange"
+              ;title:"Xchange-Myads"
               ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
               ;meta(charset "utf-8");
               ;meta(name "viewport", content "width=device-width, initial-scale=1");
               ;script(src "https://cdn.jsdelivr.net/npm/pica@9.0.1/dist/pica.min.js");
               ;script(src "https://cdn.jsdelivr.net/npm/image-blob-reduce@4.1.0/dist/image-blob-reduce.min.js");
               ;script: {script}
+              ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
               ;style: {style}              
             ==::closes head
               ;body
@@ -1546,7 +2066,18 @@
                     ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                     ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                   ==                                   :: Closes form
-                ==   
+                ==
+                :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                                ~[;span(class "nav-dot", title "New transaction");]
+                              ~
+                        ==  
               ;div.ship-box                    
                     ::;p: 
                       ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -1577,11 +2108,17 @@
                   ;a(href "/apps/xchange/myads"): My Ads
                 == 
                 ;li
+                  ;a(href "/apps/xchange/wallet"): Wallet
+                ==
+                ;li
+                  ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                ==
+                ;li
                   ;a(href "/apps/xchange/pals"): Pals
                 ==
-                  ;li
-                  ;a(href "/apps/xchange/subscriptions"): Subscriptions
-                ==
+                ;li
+                ;a(href "/apps/xchange/subscriptions"): Subscriptions
+              ==
               ==
           ==::closes left-bar
         ::
@@ -1644,7 +2181,7 @@
                                   ;td(style "display: none;"): {(trip id.a)}
                                   ;td(style "text-align: center; vertical-align: middle;")
                                       ;+  ?~  image1.a
-                                        ;div(style "width: 80px; height: 80px; background-color: #ffffff; border: 0px solid #ddd; border-radius: 4px; display: inline-block;");
+                                        ;div(style "wid th: 80px; height: 80px; background-color: #ffffff; border: 0px solid #ddd; border-radius: 4px; display: inline-block;");
                                       ?:  =(filename1.u.image1.a '')
                                         ;div(style "width: 80px; height: 80px; background-color: #ffffff; border: 0px solid #ddd; border-radius: 4px; display: inline-block;");
                                         ;img(src "/apps/xchange/img/listing/{(trip id.a)}/1", alt "Thumbnail", style "max-width: 80px; max-height: 80px; object-fit: cover; border-radius: 4px;");
@@ -1764,6 +2301,12 @@
                     ;li
                       ;a(href "/apps/xchange/myads"): My Ads
                     ==                      
+                    ;li
+                      ;a(href "/apps/xchange/wallet"): Wallet
+                    ==
+                    ;li
+                      ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                    ==
                     ;li
                       ;a(href "/apps/xchange/pals"): Pals
                     ==
@@ -1997,6 +2540,12 @@
                         ==  
                         ;li
                           ;a(href "/apps/xchange/myads"): My Ads
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/wallet"): Wallet
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
                         ==                      
                         ;li
                           ;a(href "/apps/xchange/pals"): Pals
@@ -2130,7 +2679,7 @@
           ==
 ::
     ++  get-view-alert 
-        |=  [req=(pair @ta inbound-request:eyre) purl-pair=[alert-id=@t id-value=@t] now=@da our=@p eny=@t alerts=(map id=@t alert) alert-results=(map ad-id=@t alert-result) listings1=(map id=@t advert1)]
+        |=  [req=(pair @ta inbound-request:eyre) purl-pair=[alert-id=@t id-value=@t] now=@da our=@p eny=@t alerts=(map id=@t alert) alert-results=(map ad-id=@t alert-result) listings1=(map id=@t advert1) transfer-history=(map tx-hash=@ux transfer-record)]
         ^-  (list card)
         =/  alert-id-result  (~(get by alerts) id-value.purl-pair)
         =/  alert-results-list 
@@ -2149,6 +2698,7 @@
             ;meta(charset "utf-8");
             ;meta(name "viewport", content "width=device-width, initial-scale=1");
             ;style: {style}
+            ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
           ==:: closes head
           ;body
                     ;div(class "header-wrapper")
@@ -2158,7 +2708,18 @@
                             ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                             ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                           ==                                   :: Closes form
-                        ==   
+                        ==
+                      :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                              ~[;span(class "nav-dot", title "New transaction");]
+                            ~
+                          ==
                       ;div.ship-box                    
                             ::;p: 
                               ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -2205,6 +2766,12 @@
                         == 
                         ;li
                           ;a(href "/apps/xchange/alert"): Alerts
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/wallet"): Wallet
+                        ==
+                        ;li
+                          ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
                         ==
                         ;li
                           ;a(href "/apps/xchange/pals"): Pals
@@ -2614,19 +3181,19 @@
             ?:  =(adfilename2 '')
               ?~  existing-ad  ~  image2.u.existing-ad  :: Keep existing if no new upload
             `[adfilename2 adcontenttype2 [adfile2-size adfile2]]  :: New upload or replacement
-        =/  new-advert  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus]
+        ::=/  new-advert  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus]
         =/  new-advert1  [adtitle now adtype [~ adprice] [~ adtimezone] adcontact our addescription adstatus image1-info image2-info]
-        =/  newlistings  ?:  =(%.y adstatus)
-                          (~(put by listings) ad-id new-advert)
-                          (~(del by listings) ad-id)
+        ::=/  newlistings  ?:  =(%.y adstatus)
+                          ::(~(put by listings) ad-id new-advert)
+                          ::(~(del by listings) ad-id)
         =/  newlistings1  ?:  =(%.y adstatus)
                           (~(put by listings1) ad-id new-advert1)
                           (~(del by listings1) ad-id)                  
-        =/  newmylistings  (~(put by mylistings) ad-id new-advert)  :: Update `mylistings`
+        ::=/  newmylistings  (~(put by mylistings) ad-id new-advert)  :: Update `mylistings`
         =/  newmylistings1  (~(put by mylistings1) ad-id new-advert1)  :: Update `mylistings`
         =/  new-alert-results  (alert-matches alerts newmylistings1)
         =/  success-message  'Ad Added Successfully'
-        state(mylistings newmylistings, listings newlistings, mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
+        state(mylistings1 newmylistings1, listings1 newlistings1, alert-results new-alert-results, message-myads success-message)
                     ::
     ::
     ++  post-myad-state-update
@@ -3378,6 +3945,29 @@
             [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`file-octs)]
             [%give %kick [/http-response/[p.req]]~ ~]
           ==
+        ++  serve-wallet-js
+          |=  [req=(pair @ta inbound-request:eyre) our=@p now=@da]
+          ^-  (list card)
+          =/  file-content=@
+            .^(@ %cx /(scot %p our)/xchange/(scot %da now)/web/script/xchange-wallet/js)
+          ::~&  [%file-content-size (met 3 file-content)]
+          =/  file-octs  [(met 3 file-content) file-content]
+          ::~&  [%file-octs file-octs]
+          =/  unit-octs  `file-octs
+          ::~&  [%unit-octs unit-octs]
+          ::~&  [%about-to-vase 'vasing now']
+          =/  vased  !>(`file-octs)
+          ::~&  [%vased-type p.vased]
+          =/  =response-header:http
+            :-  200
+            :~  ['content-type' 'application/javascript; charset=utf-8']
+                ['cache-control' 'public, max-age=3600']
+            ==
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data vased]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
         --
       ::
     ++  serve-listing-image
@@ -3424,7 +4014,7 @@
         ==
       ::
       ++  get-view-ad
-          |=  [req=(pair @ta inbound-request:eyre) purl-pair=[ad-id=@t id-value=@t] now=@da our=@p eny=@t mylistings=(map myad-id=@t advert) mylistings1=(map myad-id=@t advert1) listings=(map myad-id=@t advert) listings1=(map myad-id=@t advert1)]
+          |=  [req=(pair @ta inbound-request:eyre) purl-pair=[ad-id=@t id-value=@t] now=@da our=@p eny=@t mylistings=(map myad-id=@t advert) mylistings1=(map myad-id=@t advert1) listings=(map myad-id=@t advert) listings1=(map myad-id=@t advert1) transfer-history=(map tx-hash=@ux transfer-record)]
           ^-  (list card)
           =/  listinginfo   ^-  (unit advert1)
               ?~  (~(get by mylistings1) id-value.purl-pair)
@@ -3441,6 +4031,7 @@
                 ;meta(charset "utf-8");
                 ;meta(name "viewport", content "width=device-width, initial-scale=1");
                 ;style: {style}
+                ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
               ==:: closes head
               ;body
                 ;div(class "header-wrapper")
@@ -3450,7 +4041,18 @@
                               ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                               ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                             ==                                   :: Closes form
-                          ==   
+                          ==
+                         :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                              ~[;span(class "nav-dot", title "New transaction");]
+                            ~
+                          ==
                         ;div.ship-box                    
                               ::;p: 
                                 ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -3482,6 +4084,12 @@
                           ==
                           ;li
                             ;a(href "/apps/xchange/pals"): Pals
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/wallet"): Wallet
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
                           ==
                           ;li
                             ;a(href "/apps/xchange/subscriptions"): Subscriptions
@@ -3571,7 +4179,7 @@
       ::
       ::
       ++  get-pals
-            |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t my-avoids=(map ship=@p my-avoid) my-favorites=(map ship=@p comment=@t) message-pals=@t]
+            |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t my-avoids=(map ship=@p my-avoid) my-favorites=(map ship=@p comment=@t) message-pals=@t transfer-history=(map tx-hash=@ux transfer-record)]
             ^-  (list card)
             ::=/  message-pals  ''
             =/  body
@@ -3580,10 +4188,11 @@
               %-  en-xml:html
               ;html
                 ;head
-                  ;title:"Xchange"
+                  ;title:"Xchange-Pals"
                   ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
                   ;meta(charset "utf-8");
                   ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                  ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
                   ;style: {style}
                 ==::closes head
                   ;body
@@ -3594,7 +4203,18 @@
                               ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                               ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                             ==                                   :: Closes form
-                          ==   
+                          ==
+                        :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                                ~[;span(class "nav-dot", title "New transaction");]
+                              ~
+                          ==  
                         ;div.ship-box                    
                               ::;p: 
                                 ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -3624,6 +4244,12 @@
                           ;li
                             ;a(href "/apps/xchange/myads"): My Ads
                           == 
+                          ;li
+                            ;a(href "/apps/xchange/wallet"): Wallet
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                          ==
                           ;li
                             ;a(href "/apps/xchange/pals"): Pals
                           ==
@@ -4134,6 +4760,12 @@
                             ;li
                               ;a(href "/apps/xchange/myads"): My Ads
                             == 
+                             ;li
+                              ;a(href "/apps/xchange/wallet"): Wallet
+                            ==
+                            ;li
+                              ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                            ==
                             ;li
                               ;a(href "/apps/xchange/pals"): Pals
                             ==
@@ -4479,6 +5111,7 @@
                     alert-results=(map ad-id=@t alert-result)
                     mylistings1=(map id=@t advert1)
                     listings1=(map id=@t advert1)
+                    transfer-history=(map tx-hash=@ux transfer-record)
             ==
             ^-  (list card)
               =/  alerts-count  ~(wyt by alerts)
@@ -4502,10 +5135,11 @@
             %-  en-xml:html
             ;html
                   ;head
-                    ;title:"Xchange"
+                    ;title:"Xchange-Subscriptions"
                     ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
                     ;meta(charset "utf-8");
                     ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                    ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
                     ;style: {style}
                   ==  :: closes `;head`
                   ;body
@@ -4516,7 +5150,18 @@
                                 ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
                                 ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
                               ==                                   :: Closes form
-                            ==   
+                            ==
+                          :: Wallet Connection Section
+                        ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                              ~[;span(class "nav-dot", title "New transaction");]
+                            ~
+                          ==
                           ;div.ship-box                    
                                 ::;p: 
                                   ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
@@ -4546,6 +5191,12 @@
                             ;li
                               ;a(href "/apps/xchange/myads"): My Ads
                             == 
+                             ;li
+                              ;a(href "/apps/xchange/wallet"): Wallet
+                            ==
+                            ;li
+                              ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                            ==
                             ;li
                               ;a(href "/apps/xchange/pals"): Pals
                             ==
@@ -4741,6 +5392,12 @@
                                     ;a(href "/apps/xchange/myads"): My Ads
                                   ==                        
                                   ;li
+                                    ;a(href "/apps/xchange/wallet"): Wallet
+                                  ==
+                                  ;li
+                                    ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                                  ==
+                                  ;li
                                     ;a(href "/apps/xchange/pals"): Pals
                                   ==
                                   ;li
@@ -4824,6 +5481,1606 @@
                     [%give %kick [/http-response/[p.req]]~ ~]   
                 ==
         ::
+      ++  get-wallet
+          |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t my-wallets=(map addr sigm) message-settings=@t]
+          ^-  (list card)
+          =/  body
+            %-  as-octs:mimes:html
+            %-  crip
+            %-  en-xml:html
+            ;html
+              ;head
+                ;title:"Xchange - Wallet Management"
+                ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
+                ;meta(charset "utf-8");
+                ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ;style: {style}
+                ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
+              ==
+            
+            ;body
+              ;div(class "header-wrapper")
+                ;img(src "/apps/xchange/img/xchange-logo.png", alt "Xchange Logo", class "header-logo");
+                ;div.search-bar
+                    ;form(method "get", action "/apps/xchange/search", class "search-form")
+                      ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
+                      ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
+                    ==     :: Closes form
+                ==   ::  closes search-bar
+                ;div.ship-box                    
+                        ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
+                        ;img(src "/apps/xchange/sigil?p={(trip `@t`(scot %p our))}&size=175", alt "Your Sigil", class "ship-sigil");                           
+                        ;a(href "/apps/xchange/settings", style "color: #666; margin-left: 16px; font-size: 48px; text-decoration: none;"): ⚙️                                               
+                ==   :: closes ship-box                          
+              == ::closes header-wrapper
+              ;div.spacer
+                ;br;
+                ;br;
+              ==::closes .spacer
+            ::
+            ;div.main-content
+                    ;div.left-bar
+                      ;ul
+                          ;li
+                            ;a(href "/apps/xchange"): Home
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/alert"): Alerts
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/postad"): Post an Ad
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/myads"): My Ads
+                          == 
+                          ;li
+                            ;a(href "/apps/xchange/wallet"): Wallet
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/pals"): Pals
+                          ==
+                          ;li
+                            ;a(href "/apps/xchange/subscriptions"): Subscriptions
+                          ==
+                        ==
+                    ==::closes left-bar  
+              ;div.wallet-layout
+                  :: Connect Wallet Section - left side
+                  ;div.wallet-content
+                      ;div.wallet-header
+                        ;div.wallet-prompt
+                          ;button.wallet-connect-btn: Connect MetaMask
+                        ==
+                        ;div.wallet-link-section
+                          ;button.wallet-link-btn: Sign & Link This Wallet
+                        ==
+                        ;div.transactions-button
+                         ;a.transactions-btn(href "/apps/xchange/transactions"): Transactions
+                        ==
+                      ==::closes wallet-header
+                      ;div(class "wallet-connected-info", style "display: none;")
+                          ;div(style "background: #f0f9f0; padding: 20px; border-radius: 8px; margin-bottom: 20px; width: 20%")
+                            ;p(style "font-weight: bold; margin-bottom: 10px;"): ✓ Wallet Connected
+                            ;p(style "margin-bottom: 5px;"): 
+                              ;strong: Address: 
+                              ;span(class "wallet-status"): Loading...
+                          ==::closes div
+                          ;p: 
+                            ;strong: Balance: 
+                            ;span(class "wallet-balance", style "color: #666; padding: 20px;"): 0.00 ETH
+                      ==::  closes div
+                    ==:: closes wallet-content       
+                    :: My Linked Wallets Section
+                    ;div(class "linked-wallets-card", style "background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);")
+                      ;h2(style "font-size: 24px; margin-bottom: 20px;"): My Linked Wallets   
+                      ;+  ?:  =(~(wyt by my-wallets) 0)
+                            ;p(style "color: #666; font-style: italic;"): No wallets linked yet. Connect and link a wallet above.
+                          ;div
+                            ;table(style "width: 90%; border-collapse: collapse;")
+                              ;tr(style "background-color: #f5f5f5; border-bottom: 2px solid #ddd;")
+                                ;th(style "padding: 12px; text-align: left; font-weight: bold;"): Nickname
+                                ;th(style "padding: 12px; text-align: left; font-weight: bold;"): Address
+                                ;th(style "padding: 12px; text-align: left; font-weight: bold;"): Linked Date
+                                ;th(style "padding: 12px; text-align: left; font-weight: bold;"): Primary
+                                ;th(style "padding: 12px; text-align: left; font-weight: bold;"): Transfer Status
+                                ;th(style "padding: 12px; text-align: center; font-weight: bold;"): Actions
+                              ==
+                              ;*  %+  turn  ~(tap by my-wallets)
+                                |=  [addr=@ux sig=sigm]
+                                ;tr(style "border-bottom: 1px solid #eee;")
+                                  ;td(style "padding: 12px; font-weight: bold; color: #2196f3;"): {(trip nickname.sig)}
+                                  ;td(style "padding: 12px; font-family: monospace;"): {(trip (hextocord addr))}
+                                  ;td(style "padding: 12px;"): {(trip (get-date when.sig))}
+                                  ;td
+                                    ;+  ?:  =(primary.sig %.y)
+                                      ;span(style "color: green; font-weight: bold;"): ✓ Yes
+                                      ;span(style "color: #999;"): No
+                                  ==
+                                  ;td
+                                    ;+  ?:  =(transfer-ok.sig %.y)
+                                      ;span(style "color: green; font-weight: bold;"): ✓ Active
+                                      ;span(style "color: #999;"): Disabled
+                                  ==
+                                  ;td(style "padding: 12px; text-align: center;")
+                                    ;div(style "display: flex; flex-direction: column; gap: 8px; align-items: center;")
+                                      :: Edit nickname button (NEW)
+                                      ;button(class "edit-nickname-btn", data-address "{(trip (scot %ux addr))}", data-nickname "{(trip nickname.sig)}", style "background: #0000FF; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;"): ✏️ Edit Name
+                                      :: Unlink button
+                                      ;form(method "post", action "/apps/xchange/unlink-wallet", style "display: inline;")
+                                        ;input(type "hidden", name "address", value "{(trip (scot %ux addr))}");
+                                        ;button(type "submit", name "action", value "unlink", class "unlink-button", onclick "return confirm('Are you sure you want to unlink this wallet?');"): ⛓️‍💥 Unlink
+                                      ==
+                                      
+                                      :: Toggle transfer button
+                                      ;form(method "post", action "/apps/xchange/toggle-transfer", style "display: inline;")
+                                        ;input(type "hidden", name "address", value "{(trip (scot %ux addr))}"); 
+                                        ;+  ?:  =(transfer-ok.sig %.y) 
+                                          ;button(type "submit", class "toggle-transfer-button"): Disable Transfer 🚫
+                                          ;button(type "submit", class "toggle-transfer-button-open"): Enable Transfer 🔁
+                                      ==
+                                      
+                                      :: Toggle primary button
+                                      ;form(method "post", action "/apps/xchange/toggle-primary", style "display: inline;")
+                                        ;input(type "hidden", name "address", value "{(trip (scot %ux addr))}"); 
+                                        ;+  ?:  =(primary.sig %.y) 
+                                          ;button(type "submit", class "toggle-transfer-button"): Remove Default ⭕
+                                          ;button(type "submit", class "toggle-transfer-button-open"): Set as Default 🔄
+                                      ==  :: closes form
+                                    == :: closes div
+                                  ==:: closes td
+                                ==:: closes tr
+                            ==
+                          ==:: closes div
+                      ==   :: closes linked-wallets-card 
+                    == :: closes wallet-layout    
+                == :: closes main-content
+              ==:: closes body
+            ==:: closes html
+            ::
+        =/  =response-header:http
+          :-  200
+          :~  ['Content-Type' 'text/html; charset=utf-8']
+              ['Content-Security-Policy' 'default-src \'self\'; script-src \'self\' \'unsafe-eval\' https://esm.sh https://cdn.esm.sh https://cdnjs.cloudflare.com; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' https: wss:; img-src \'self\' data:;']
+          ==
+        :~
+          [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+          [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+          [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+    ::  
+      ++  hextocord
+        |=  x=@ux
+        (crip ['0' 'x' ((x-co:co (met 3 x)) x)])
+      ::  
+      ++  cordtohex
+        |=  c=@t
+        ^-  (unit @ux)
+        (rush c ;~(pfix (jest '0x') hex))
+      ::
+      ++  parse-eth-transaction
+          |=  json=^json
+          ::~&  [%parse-eth-transaction-json json]
+          ^-  (unit [from=@ux to=@ux value=@ud input=@t])
+          
+          :: Check if JSON is an object
+          ?.  ?=(%o -.json)
+          ::~&  [%json-not-object 'top level json is not object']
+            ~
+          
+          :: Get the "result" field
+          =/  result  (~(get by p.json) 'result')
+          ::~&  [%result-field result]
+          ?~  result
+            ~
+          
+          :: When RPC returns {"result": null}, u.result is %n (JSON null)
+          ?:  =(u.result ~)
+            ::~&  [%transaction-not-yet-mined 'RPC returned null - transaction pending']
+            ~
+          
+          :: Result should be an object with transaction details
+          ?.  ?=(%o -.u.result)
+            ::~&  [%result-is-not-object 'expected object, got' -.u.result]
+            ~
+          
+          =/  tx-obj  p.u.result
+          
+          :: Extract from, to, value fields
+          =/  from-json  (~(get by tx-obj) 'from')
+          =/  to-json  (~(get by tx-obj) 'to')
+          =/  value-json  (~(get by tx-obj) 'value')
+          =/  input-json  (~(get by tx-obj) 'input')
+          
+          :: All fields must exist and be strings
+          ?.  &(?=(^ from-json) ?=(^ to-json) ?=(^ value-json))
+            ::~&  [%missing-fields from=?=(^ from-json) to=?=(^ to-json) value=?=(^ value-json)]
+            ~
+          ?.  &(?=(%s -.u.from-json) ?=(%s -.u.to-json) ?=(%s -.u.value-json))
+            ::~&  [%wrong-field-types from=-.u.from-json to=-.u.to-json value=-.u.value-json]
+            ~
+          
+          :: Parse hex strings
+          =/  from-addr  (cordtohex p.u.from-json)
+          =/  to-addr  (cordtohex p.u.to-json)
+          =/  value-hex  (cordtohex p.u.value-json)
+          
+          ?.  &(?=(^ from-addr) ?=(^ to-addr) ?=(^ value-hex))
+            ::~&  [%failed-to-parse-hex from=p.u.from-json to=p.u.to-json value=p.u.value-json]
+            ~
+          
+          :: Convert value from @ux to @ud
+          ::=/  value-ud=@ud  u.value-hex
+          =/  value-ud=@ud  `@ud`u.value-hex
+          
+         :: Extract input calldata as @t
+          =/  input=@t
+            ?~  input-json  ''
+            ?.  ?=(%s -.u.input-json)  ''
+            p.u.input-json
+
+          `[u.from-addr u.to-addr value-ud input]
+    ::
+    ++  parse-erc20-transfer
+        |=  input=@t
+        ^-  (unit [to=@ux amount=@ud])
+        =/  stripped-tape  (slag 2 (trip input))
+        :: Check function selector is transfer(address,uint256)
+        ?.  =("a9059cbb" (scag 8 stripped-tape))
+          ~
+        :: Recipient is chars 8-71 (64 chars), but first 24 are zero padding
+        :: so actual address is chars 32-71
+        =/  recipient-hex  (crip (slag 24 (scag 64 (slag 8 stripped-tape))))
+        :: Amount is chars 72-135 (64 chars)
+        =/  amount-hex  (crip (scag 64 (slag 72 stripped-tape)))
+        =/  recipient  (cordtohex (cat 3 '0x' recipient-hex))
+        =/  amount-ux  (cordtohex (cat 3 '0x' amount-hex))
+        ?.  &(?=(^ recipient) ?=(^ amount-ux))
+          ~
+        `[u.recipient `@ud`u.amount-ux]
+      ::
+      ++  link-wallet-state
+          |=  [req=(pair @ta inbound-request:eyre) now=@da our=@p eny=@t]
+          ^-  _state
+          
+          :: Extract body text
+          =/  data=octs  +.body.request.q.req
+          =/  text-data  +.data
+          =/  parsedata  (need (rush text-data yquy:de-purl:html))     
+          ::: Extract form fields by index (same order as JavaScript submits them)
+          =/  address-raw  (snag 0 parsedata)        :: address
+          =/  signature-raw  (snag 1 parsedata)      :: signature
+          =/  message-raw  (snag 2 parsedata)        :: message
+          =/  nickname-raw  (snag 3 parsedata)       :: nickname
+          =/  timestamp-raw  (snag 4 parsedata)      :: timestamp
+          
+           :: Get the actual values (the +. gets the value from the [k=@t v=@t] pair)
+          =/  address-cord  +.address-raw
+          =/  signature-cord  +.signature-raw
+          =/  message-cord  +.message-raw
+          =/  nickname-cord  +.nickname-raw
+
+          :: Convert address from cord to @ux
+          =/  addr-maybe=(unit @ux)  (cordtohex address-cord)
+          ?~  addr-maybe
+            state(message-settings 'Error: Invalid wallet address format')
+          
+          :: Convert signature from cord to @ux
+          =/  sig-maybe=(unit @ux)  (cordtohex signature-cord)
+          ?~  sig-maybe
+            state(message-settings 'Error: Invalid signature format')
+          
+          :: Get nickname or use default
+          =/  wallet-nickname=@t
+            ?:  =((lent (trip nickname-cord)) 0)
+              'My Wallet'  :: Default if empty string
+            nickname-cord
+          
+          :: Check if this is the first wallet
+          =/  is-first=?  =(~(wyt by my-wallets.state) 0)
+          
+          :: Create signature structure with nickname
+          =/  new-sig=sigm
+            :*  sign=u.sig-maybe
+                nickname=wallet-nickname
+                mesg=message-cord
+                when=now
+                primary=is-first
+                transfer-ok=is-first
+            ==
+          
+          :: Update state with new wallet
+          =/  updated-wallets  (~(put by my-wallets.state) u.addr-maybe new-sig)
+          =/  success-message=@t
+            ?:  is-first
+              'Wallet linked successfully! Set as primary and transfers enabled.'
+            'Wallet linked successfully!'
+          
+          state(my-wallets updated-wallets, message-wallets success-message)
+        ::
+        ::
+      ++  unlink-wallet-state
+        |=  [req=(pair @ta inbound-request:eyre) our=@p]
+        ^-  _state
+        :: Extract body text
+        =/  data=octs  +.body.request.q.req
+        =/  text-data  +.data
+        =/  parsedata  (need (rush text-data yquy:de-purl:html))
+        :: Extract address field
+        =/  address-raw  (snag 0 parsedata)
+        =/  address-cord  +.address-raw
+        :: Convert address from cord to @ux
+        :: Convert address from cord to @ux
+        =/  addr-maybe=(unit @ux)  (slaw %ux address-cord)
+        ?~  addr-maybe
+          state(message-settings 'Error: Invalid wallet address format')
+        :: Update state by removing wallet
+        state(my-wallets (~(del by my-wallets.state) u.addr-maybe), message-wallets 'Wallet unlinked successfully!')
+      ::
+     
+     ++  link-wallet-webpage
+          |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t]
+          ^-  (list card)
+          
+          :: Redirect back to wallet page with 303 See Other
+          =/  =response-header:http
+            :-  303
+            :~  ['Location' '/apps/xchange/wallet']
+                ['Content-Type' 'text/html; charset=utf-8']
+            ==
+          
+          =/  empty-body  [0 0]  :: Empty octs = [size data]
+          
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`empty-body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+       ++  unlink-wallet-webpage
+        |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t]
+        ^-  (list card)
+        
+        :: Redirect back to wallet page with 303 See Other
+        =/  =response-header:http
+          :-  303
+          :~  ['Location' '/apps/xchange/wallet']
+              ['Content-Type' 'text/html; charset=utf-8']
+          ==
+         =/  empty-body  [0 0]  :: Empty octs = [size data]
+        :~
+          [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+          [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`empty-body)]
+          [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+      ::
+      ++  redirect-to
+          |=  [req=(pair @ta inbound-request:eyre) location=@t]
+          ^-  (list card)
+          =/  =response-header:http
+            :-  303
+            :~  ['Location' location]
+            ==
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  toggle-transfer-state
+          |=  [req=(pair @ta inbound-request:eyre) our=@p]
+          ^-  _state
+          :: Extract body text
+          =/  body-text=@t
+            ?~  body.request.q.req  ''
+            q.u.body.request.q.req
+          
+          :: Parse query string
+          =/  body-result=(unit (list [k=@t v=@t]))  
+            (rush body-text yquy:de-purl:html)
+          
+          ?~  body-result
+            state(message-settings 'Error: Invalid form data')
+          
+          =/  body  (malt u.body-result)
+          =/  address  (~(get by body) 'address')
+          
+          ?.  ?=(^ address)
+            state(message-settings 'Error: Missing address')
+          
+          :: Convert address from cord to @ux
+          =/  addr-maybe=(unit @ux)  (slaw %ux u.address)
+          ?~  addr-maybe
+            state(message-settings 'Error: Invalid wallet address format')
+          
+          :: Get the wallet entry
+          =/  wallet-entry  (~(get by my-wallets.state) u.addr-maybe)
+          ?~  wallet-entry
+            state(message-settings 'Error: Wallet not found')
+          
+          :: Toggle transfer-ok field
+          =/  updated-sig=sigm  u.wallet-entry(transfer-ok !transfer-ok.u.wallet-entry)
+          
+          :: Update state with toggled wallet
+          state(my-wallets (~(put by my-wallets.state) u.addr-maybe updated-sig), message-settings 'Transfer setting updated!')
+      ::
+      ++  toggle-primary-state
+          |=  [req=(pair @ta inbound-request:eyre) our=@p]
+          ^-  _state
+          :: Extract body text
+          =/  body-text=@t
+            ?~  body.request.q.req  ''
+            q.u.body.request.q.req
+          
+          :: Parse query string
+          =/  body-result=(unit (list [k=@t v=@t]))  
+            (rush body-text yquy:de-purl:html)
+          
+          ?~  body-result
+            state(message-settings 'Error: Invalid form data')
+          
+          =/  body  (malt u.body-result)
+          =/  address  (~(get by body) 'address')
+          
+          ?.  ?=(^ address)
+            state(message-settings 'Error: Missing address')
+          
+          :: Convert address from cord to @ux
+          =/  addr-maybe=(unit @ux)  (slaw %ux u.address)
+          ?~  addr-maybe
+            state(message-settings 'Error: Invalid wallet address format')
+          
+          :: Get the wallet entry
+          =/  wallet-entry  (~(get by my-wallets.state) u.addr-maybe)
+          ?~  wallet-entry
+            state(message-settings 'Error: Wallet not found')
+          
+          :: Toggle transfer-ok field
+          =/  updated-sig=sigm  u.wallet-entry(primary !primary.u.wallet-entry)
+          
+          :: Update state with toggled wallet
+          state(my-wallets (~(put by my-wallets.state) u.addr-maybe updated-sig), message-settings 'Transfer setting updated!')
+
+      ::
+      ++  edit-wallet-nickname-state
+          |=  [req=(pair @ta inbound-request:eyre) our=@p]
+          ^-  _state
+          
+          :: Extract body data
+          =/  data=octs  +.body.request.q.req
+          =/  text-data  (crip (trip +.data))
+          =/  parsedata  (need (rush text-data yquy:de-purl:html))
+          
+          :: Extract form fields by index
+          =/  address-raw  (snag 0 parsedata)     :: address
+          =/  nickname-raw  (snag 1 parsedata)    :: nickname
+          
+          :: Get values
+          =/  address-cord  +.address-raw
+          =/  nickname-cord  +.nickname-raw
+          
+          :: Validate nickname not empty
+          ?:  =((lent (trip nickname-cord)) 0)
+            state(message-settings 'Error: Nickname cannot be empty')
+          
+          :: Convert address from cord to @ux
+          =/  addr-maybe=(unit @ux)  (slaw %ux address-cord)
+          ?~  addr-maybe
+            state(message-settings 'Error: Invalid wallet address format')
+          
+          :: Get existing wallet
+          =/  existing  (~(get by my-wallets.state) u.addr-maybe)
+          ?~  existing
+            state(message-settings 'Error: Wallet not found')
+          
+          :: Create updated sigm with new nickname
+          =/  updated-sig=sigm
+            :*  sign.u.existing
+                nickname=nickname-cord
+                mesg.u.existing
+                when.u.existing
+                primary.u.existing
+                transfer-ok.u.existing
+            ==
+          
+          :: Update state
+          =/  updated-wallets  (~(put by my-wallets.state) u.addr-maybe updated-sig)
+          state(my-wallets updated-wallets, message-settings 'Wallet nickname updated!')
+        ::
+      ::
+      ++  toggle-transfer-webpage
+          |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t]
+          ^-  (list card)
+          
+          :: Redirect back to wallet page with 303 See Other
+          =/  =response-header:http
+            :-  303
+            :~  ['Location' '/apps/xchange/wallet']
+                ['Content-Type' 'text/html; charset=utf-8']
+            ==
+          
+          =/  empty-body  [0 0]  :: Empty octs = [size data]
+          
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`empty-body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  toggle-primary-webpage
+          |=  [req=(pair @ta inbound-request:eyre) our=@p eny=@t]
+          ^-  (list card)
+          
+          :: Redirect back to wallet page with 303 See Other
+          =/  =response-header:http
+            :-  303
+            :~  ['Location' '/apps/xchange/wallet']
+                ['Content-Type' 'text/html; charset=utf-8']
+            ==
+          
+          =/  empty-body  [0 0]  :: Empty octs = [size data]
+          
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`empty-body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  get-pay-transfer
+          |=  $:  req=(pair @ta inbound-request:eyre)
+              our=@p
+              eny=@t
+              my-wallets=(map addr sigm)
+              transfer-history=(map tx-hash=@ux transfer-record)
+              pending-transactions=(map request-id=@ta pending-transaction)
+            ==
+          ^-  (list card)
+          =/  body
+            %-  as-octs:mimes:html
+            %-  crip
+            %-  en-xml:html
+            ;html
+              ;head
+                ;title:"Xchange - Pay & Transfer"
+                ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
+                ;meta(charset "utf-8");
+                ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ;style: {style}
+                ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
+                ;script(type "module", src "/apps/xchange/js/xchange-pay-transfer.js");
+              ==       
+              ;body
+                ;div(class "header-wrapper")
+                  ;img(src "/apps/xchange/img/xchange-logo.png", alt "Xchange Logo", class "header-logo");
+                  ;div.search-bar
+                    ;form(method "get", action "/apps/xchange/search", class "search-form")
+                      ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
+                      ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
+                    ==
+                  ==
+                  :: Wallet Connection Section
+                       ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                                ~[;span(class "nav-dot", title "New transaction");]
+                              ~
+                          ==
+                  ;div.ship-box                    
+                    ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
+                    ;img(src "/apps/xchange/sigil?p={(trip `@t`(scot %p our))}&size=175", alt "Your Sigil", class "ship-sigil");                           
+                    ;a(href "/apps/xchange/settings", style "color: #666; margin-left: 16px; font-size: 48px; text-decoration: none;"): ⚙️                                               
+                  ==
+                ==
+                ;div.spacer
+                  ;br;
+                  ;br;
+                ==
+                ::
+                ;div.main-content
+                  ;div.left-bar
+                    ;ul
+                      ;li
+                        ;a(href "/apps/xchange"): Home
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/alert"): Alerts
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/postad"): Post an Ad
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/myads"): My Ads
+                      == 
+                      ;li
+                        ;a(href "/apps/xchange/wallet"): Wallet
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/pals"): Pals
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/subscriptions"): Subscriptions
+                      ==
+                    ==
+                  ==
+                  ::
+                  ;div.content-area
+                   ;div.metamask-transfer
+                      ;h1
+                        ; Pay & Transfer
+                        ;br;
+                        ; Metamask
+                      ==:: closes h1
+                      ;div(class "transfer-form-container")
+                        ;form(method "POST", action "/apps/xchange/pay-transfer")
+                          ;div(class "form-section")
+                            ;label2(for "recipient-ship"): Recipient Ship 
+                            ;input(type "text", id "recipient-ship", name "recipient-ship", placeholder "~sampel-palnet", style "font-size: 18px; width: 100%;");
+                            ;button(type "submit", class "lookup-wallet-button"): Lookup Wallet
+                          ==
+                        ==
+                        ::  Wallet info display (hidden until lookup succeeds)
+                        ;div(id "wallet-info", class "wallet-info", style "display: none;")
+                          ;p: Recipient Wallet:
+                          ;p(id "recipient-wallet-display", style "font-family: monospace; word-break: break-all;");
+                        ==
+                        ::  Status messages
+                        ;div(id "tx-status", class "tx-status");
+                        
+                        ::  ← ADD CURRENCY SELECTOR HERE ←
+                        ;div(class "form-section")
+                          ;label2(for "currency-select"): Currency 
+                          ;select(id "currency-select", name "currency", style "font-size: 18px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; width: 100%;")
+                            ;option(value "ETH", selected ""): ETH (Ethereum)
+                            ;option(value "USDC"): USDC (Stablecoin)
+                          ==
+                        ==
+                        
+                        ::  Amount input (updated label from "Amount (ETH)" to just "Amount")
+                        ;div(class "form-section")
+                          ;label2(for "amount-eth"): Amount 
+                          ;input(type "number", id "amount-eth", placeholder "0.01", step "0.001", min "0", style "font-size: 18px;");
+                        ==
+                        ;div(class "form-section")
+                          ;label2(for "pay-memo"): Payment Memo (optional) 
+                          ;input(type "text", id "pay-memo", placeholder "e.g., Payment for services", style "font-size: 18px; width: 100%;");
+                        ==
+                        ::  Send button
+                        ;div(class "form-section")
+                          ;button(id "send-eth-btn", type "button", class "send-metamask-button", disabled "true"): Send
+                        ==
+                      ==  ::  closes transfer-form-container
+                    ==  ::  closes metamask-transfer
+
+                ;*  ?:  =(pending-transactions ~)
+                  ~  :: Don't render anything
+                =/  my-pending  ~(tap by pending-transactions)
+                :_  ~  :: Single-element list containing the table
+                ;div.table-wrapper
+                  ;div.table-div
+                    ;table
+                      ;tr
+                        ;td#title-row(colspan "6")
+                          ;p: Pending Transactions
+                        ==
+                      ==
+                      ;tr
+                        ;th: Tx Hash
+                        ;th: Date Sent
+                        ;th: From
+                        ;th: To
+                        ;th: Amount (ETH)
+                        ;th: Memo
+                      ==
+                      ;*  %+  turn  my-pending
+                        |=  [request-id=@ta pend=pending-transaction]
+                        =/  tx-hash  tx-hash.transfer.pend
+                        =/  rec  rec.transfer.pend
+                        =/  from-display  ?~(from-addr.rec "N/A" (trip (hextocord u.from-addr.rec)))
+                        =/  to-display    ?~(to-addr.rec "N/A" (trip (hextocord u.to-addr.rec)))
+                        =/  from-ship-display  (trip (scot %p from-ship.rec))
+                        =/  to-ship-display  (trip (scot %p to-ship.rec))
+                        ;tr(style "background-color: #fff3cd;")
+                          ;td(class "trans-history-cell"): {(trip (hextocord tx-hash))}
+                          ;td(class "trans-history-cell"): {(trip (get-date when.rec))}
+                          ;td(class "trans-history-cell")
+                            ;div: {from-ship-display}
+                            ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {from-display}
+                          ==
+                          ;td(class "trans-history-cell")
+                            ;div: {to-ship-display}
+                            ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {to-display}
+                          ==
+                          ;td(class "trans-history-cell"): {(trip amount-eth.rec)}
+                          ;td(class "trans-history-cell"): {(trip pay-memo.rec)}
+                        ==
+                    ==
+                  ==
+                ==
+                ;div.table-wrapper
+                    ;+  ?:  =(transfer-history ~)
+                          ;div.table-div
+                            ;table
+                            ;tr
+                                ;td#title-row(colspan "7")
+                                    ;p: Transaction History
+                                ==
+                              ==
+                              ;tr
+                                ;th: Tx Hash
+                                ;th: Date
+                                ;th: From
+                                ;th: To
+                                ;th: Amount
+                                ;th: Currency
+                                ;th: Memo
+                              ==
+                              ;tr
+                                ;td#title-row(colspan "7")
+                                    ;p: No Transactions Found.
+                                ==
+                              ==
+                            ==
+                          ==
+                        =/  mytransaction-history  ~(tap by transfer-history)
+                            ;div.table-div
+                            ;table
+                                ;tr
+                                    ;td#title-row(colspan "7")
+                                        ;p: Transaction History
+                                    ==
+                                  ==
+                                ;tr
+                                  ;th: Tx Hash
+                                  ;th: Date
+                                  ;th: From
+                                  ;th: To
+                                  ;th: Amount
+                                  ;th: Currency
+                                  ;th: Memo
+                                ==
+                              ;*  %+  turn  mytransaction-history
+                                |=  [tx-hash=@ux rec=transfer-record]
+                                  =/  from-display  ?~(from-addr.rec "N/A" (trip (hextocord u.from-addr.rec)))
+                                  =/  to-display    ?~(to-addr.rec "N/A" (trip (hextocord u.to-addr.rec)))
+                                  =/  from-ship-display  (trip (scot %p from-ship.rec))
+                                  =/  to-ship-display  (trip (scot %p to-ship.rec))
+                                  ;tr
+                                    ;td(class "trans-history-cell"): {(trip (hextocord tx-hash))}
+                                    ;td(class "trans-history-cell"): {(trip (get-date when.rec))}
+                                    ;td(class "trans-history-cell")
+                                        ;div: {from-ship-display}
+                                        ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {from-display}
+                                      ==
+                                    ;td(class "trans-history-cell")
+                                      ;div: {to-ship-display}
+                                      ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {to-display}
+                                    ==
+                                    ;td(class "trans-history-cell"): {(trip amount-eth.rec)}
+                                    ;td(class "trans-history-cell"): {(trip currency.rec)}
+                                     ;td(class "trans-history-cell memo-cell")
+                                      ;form(method "post", action "/apps/xchange/update-memo")
+                                          ;input(type "hidden", name "tx-hash", value "{(trip (hextocord tx-hash))}");
+                                          ;input(type "text", name "memo", value "{(trip pay-memo.rec)}", style "min-width: 100px; overflow-wrap: break-word; word-wrap: break-word;");
+                                        ==:: closes memo form
+                                      ==:: closes memo cell
+                                  ==::  closes tr
+                              ==::  closes table
+                            ==::  closes table
+                        ==:: closes table-div  
+                      ==:: closes table-wrapper     
+                ==  ::  closes main-content        
+              ==  ::  closes body
+            ==  ::  closes html                                                    
+            ::
+          =/  =response-header:http
+            :-  200
+            :~  ['Content-Type' 'text/html; charset=utf-8']
+                ['Content-Security-Policy' 'default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://esm.sh https://cdn.esm.sh https://cdnjs.cloudflare.com; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' https: wss:; img-src \'self\' data:;']
+            ==
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  get-ship-wallet-handler
+        |=  [req=(pair @ta inbound-request:eyre) our=@p now=@da]
+        ^-  (list card)
+        ::
+        :: Parse query parameters to extract ship
+        =/  query-params  (parse-query-params url.request.q.req)
+        =/  ship-param  (~(get by query-params) 'ship')
+        ::
+        :: Check if ship parameter exists
+        ?~  ship-param
+          =/  body  (as-octs:mimes:html (en:json:html [%o (my ~[['error' s+'Missing ship parameter']])]))
+          =/  =response-header:http  [400 ~[['Content-Type' 'application/json; charset=utf-8'] ['Access-Control-Allow-Origin' '*']]]
+          :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+              [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+              [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+        ::
+        :: Parse ship name
+        =/  target-ship  (slaw %p u.ship-param)
+        ?~  target-ship
+          =/  body  (as-octs:mimes:html (en:json:html [%o (my ~[['error' s+'Invalid ship format']])]))
+          =/  =response-header:http  [400 ~[['Content-Type' 'application/json; charset=utf-8'] ['Access-Control-Allow-Origin' '*']]]
+          :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+              [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+              [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+        ::
+        :: Scry the remote ship for wallet
+        =/  wallet-result  (get-ship-wallet-scry u.target-ship our now)
+        ?~  wallet-result
+          =/  body  (as-octs:mimes:html (en:json:html [%o (my ~[['error' s+'Ship has no wallet configured for transfers']])]))
+          =/  =response-header:http  [404 ~[['Content-Type' 'application/json; charset=utf-8'] ['Access-Control-Allow-Origin' '*']]]
+          :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+              [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+              [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+        ::
+        :: Return success with wallet info
+        =/  body  
+          %-  as-octs:mimes:html
+          %-  en:json:html
+          :-  %o
+          %-  my
+          :~  ['address' s+(scot %ux addr.u.wallet-result)]
+              ['signature' s+(scot %ux sign.u.wallet-result)]
+              ['message' s+mesg.u.wallet-result]
+          ==
+        =/  =response-header:http  [200 ~[['Content-Type' 'application/json; charset=utf-8'] ['Access-Control-Allow-Origin' '*']]]
+        :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+      ++  send-json-error
+        |=  [req=(pair @ta inbound-request:eyre) status=@ud message=@t]
+        ^-  (list card)
+        ::
+        =/  json-obj=json
+          :-  %o
+          %-  my
+          :~  ['error' s+message]
+          ==
+        ::
+        =/  json-text=@t  (en:json:html json-obj)
+        =/  body=octs  (as-octs:mimes:html json-text)
+        ::
+        =/  =response-header:http
+          :-  status
+          :~  ['Content-Type' 'application/json; charset=utf-8']
+              ['Access-Control-Allow-Origin' '*']
+          ==
+        ::
+        :~
+          [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+          [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+          [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+      ::
+
+      ++  send-json-wallet
+        |=  [req=(pair @ta inbound-request:eyre) status=@ud wallet=[addr=@ux sign=@ux mesg=@t]]
+        ^-  (list card)
+        ::
+        =/  json-obj=json
+          :-  %o
+          %-  my
+          :~  ['address' s+(scot %ux addr.wallet)]
+              ['signature' s+(scot %ux sign.wallet)]
+              ['message' s+mesg.wallet]
+          ==
+        ::
+        =/  json-text=@t  (en:json:html json-obj)
+        =/  body=octs  (as-octs:mimes:html json-text)
+        ::
+        =/  =response-header:http
+          :-  status
+          :~  ['Content-Type' 'application/json; charset=utf-8']
+              ['Access-Control-Allow-Origin' '*']
+          ==
+        ::
+        :~
+          [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+          [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+          [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+      ::
+      ++  parse-query-params
+        |=  url=@t
+        ^-  (map @t @t)
+        =/  url-text  (trip url)
+        =/  query-start  (find "?" url-text)
+        ?~  query-start
+          ~
+        =/  query-string  (slag +(u.query-start) url-text)
+        =/  query-cord  (crip query-string)
+        =/  parsed  (rush query-cord yquy:de-purl:html)
+        ?~  parsed
+          ~
+        (malt u.parsed)
+      ::
+
+      ++  get-ship-wallet-scry
+        |=  [target=@p our=@p now=@da]
+        ^-  (unit [addr=@ux sign=@ux mesg=@t])
+        ::
+        =/  scry-path=path
+          /(scot %p our)/xchange/(scot %da now)/(scot %p target)/wallet/noun
+        ::
+        =/  scry-result
+          .^  (unit [addr=@ux sign=@ux mesg=@t])
+              %gx
+              scry-path
+          ==
+        ::
+        scry-result
+      ::
+      ++  serve-js-file
+          |=  [req=(pair @ta inbound-request:eyre) our=@p now=@da filename=@t]
+          ^-  (list card)
+          
+          ::  Construct the correct Clay path using the filename parameter
+          =/  file-path=path  
+            /(scot %p our)/xchange/(scot %da now)/web/script/[filename]/js
+          
+          ::~&  [%serve-js-file 'Attempting to load' file-path]
+          
+          ::  Scry for the file
+          =/  file-atom=@  .^(@ %cx file-path)
+          
+          ::  Convert atom to cord, then to octs
+          =/  file-cord=@t  file-atom
+          =/  file-octs=octs  (as-octs:mimes:html file-cord)
+          
+          ::~&  [%file-loaded filename 'Size:' p.file-octs 'bytes']
+          
+          =/  =response-header:http
+            :-  200
+            :~  ['Content-Type' 'application/javascript; charset=utf-8']
+                ['Cache-Control' 'public, max-age=3600']
+            ==
+          
+          :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+              [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`file-octs)]
+              [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  get-wallet-status
+          |=  [req=(pair @ta inbound-request:eyre) our=@p current-state=_state]
+          ^-  [(list card) _current-state]
+          
+          ::  Get the URL and parse query parameters
+          =/  url-text  (trip url.request.q.req)
+          =/  query-start  (find "?id=" url-text)
+          
+          ::~&  [%url-text url-text]
+          ::~&  [%query-start query-start]
+          
+          ?~  query-start
+            ::  No query parameter - return error
+             ::~&  [%error-no-query-param 'returning 400']
+            =/  json-obj
+              %-  pairs:enjs:format
+              :~  ['status' s+'error']
+                  ['error' s+'No request ID provided']
+              ==
+            =/  json-body  (en:json:html json-obj)
+            =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+            [cards current-state]
+          
+          ::  Extract everything after "?id="
+          =/  id-start  (add u.query-start 4)
+          =/  request-id-text  (slag id-start url-text)
+          =/  request-id  (crip request-id-text)
+          
+          ::~&  [%extracted-request-id request-id]
+          ::~&  [%request-id-type (met 3 request-id)]
+          ::~&  [%map-keys ~(tap in ~(key by wallet-lookup-results.current-state))]
+          
+          ::  Look up in wallet-lookup-results (now using @t key)
+          =/  lookup-result  (~(get by wallet-lookup-results.current-state) request-id)
+          
+          ::~&  [%lookup-result lookup-result]         
+          ?~  lookup-result
+            ::  Still pending
+            ::~&  [%returning-pending 'request not found in map']
+            =/  json-obj
+              %-  pairs:enjs:format
+              :~  ['status' s+'pending']
+              ==
+            =/  json-body  (en:json:html json-obj)
+            =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+          [cards current-state] 
+          ::  Check if successful
+          ?:  success.u.lookup-result
+            ::  Success - check if we have wallet data
+            =/  wallet-data  data.u.lookup-result
+            ?~  wallet-data
+              ::  Unit is null - no wallets
+              =/  json-obj
+                %-  pairs:enjs:format
+                :~  ['status' s+'success']
+                    ['success' b+%.n]
+                    ['error' s+'No wallets found']
+                ==
+              =/  json-body  (en:json:html json-obj)
+              =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+            [cards current-state] 
+            ::  Unwrap the unit, now check if the list is empty
+            ?~  u.wallet-data
+              ::  List is empty
+              =/  json-obj
+                %-  pairs:enjs:format
+                :~  ['status' s+'success']
+                    ['success' b+%.n]
+                    ['error' s+'No wallets in list']
+                ==
+              =/  json-body  (en:json:html json-obj)
+              =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+            [cards current-state] 
+            ::  Get the first wallet from the list
+            =/  wallet-pair  i.u.wallet-data
+            =/  wallet-addr  (hextocord -.wallet-pair)
+            =/  wallet-sigm  +.wallet-pair  
+            =/  wallet-nickname  nickname.wallet-sigm  :: Extract nickname 
+            =/  json-obj
+              %-  pairs:enjs:format
+              :~  ['status' s+'success']
+                  ['success' b+%.y]
+                  ['wallet' s+wallet-addr]
+                  ['nickname' s+wallet-nickname]
+              ==
+            =/  json-body  (en:json:html json-obj)
+            =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+          [cards current-state] 
+          ::  Failed lookup (else case)
+          =/  json-obj
+            %-  pairs:enjs:format
+            :~  ['status' s+'success']
+                ['success' b+%.n]
+                ['error' s+'Wallet not found']
+            ==
+          =/  json-body  (en:json:html json-obj)
+          =/  cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+          [cards current-state]
+
+      ::
+      ++  handle-wallet-lookup
+            |=  [req=(pair @ta inbound-request:eyre) our=@p now=@da current-state=_state]
+            ^-  [(list card) _current-state]
+            
+            ::  Clear the wallet-lookup-results map at the start
+            =/  cleared-state  current-state(wallet-lookup-results ~)
+            
+            ::  Parse the form data to get recipient ship
+            =/  data=octs  +.body.request.q.req
+            =/  text-data  (crip (trip +.data))
+            =/  parsedata  (need (rush text-data yquy:de-purl:html))
+            =/  recipient-ship-pair  (snag 0 parsedata)
+            =/  recipient-ship-cord  +.recipient-ship-pair
+            =/  target-ship  (slaw %p recipient-ship-cord)
+            
+            ?~  target-ship
+              :_  cleared-state
+              (render-wallet-error req our "Invalid ship format")
+            
+            ::  Generate request ID from current time
+            =/  request-id-ta  (scot %da now)
+            =/  request-id  (crip (trip request-id-ta))
+            =/  wire  /wallet-lookup/(scot %p u.target-ship)/[request-id]
+            
+            ::~&  [%wire wire]
+            ::~&  [%subscribing-to-wallet u.target-ship]
+            ::~&  [%request-id request-id]
+            
+            ::  Store pending request with simplified structure
+            =/  new-state  
+              cleared-state(pending-wallet-requests (~(put by pending-wallet-requests.cleared-state) request-id u.target-ship))
+            
+            ::  Build JSON response
+            =/  json-obj
+              %-  pairs:enjs:format
+              :~  ['status' s+'pending']
+                  ['request_id' s+request-id]
+              ==
+            =/  json-body  (en:json:html json-obj)
+            =/  http-cards  (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html json-body)])
+            
+            ::  Send immediate HTTP response and subscription card
+            :_  new-state
+            ;:  welp
+              http-cards
+              :~  [%pass wire %agent [u.target-ship %xchange] %watch /wallet-request]
+              ==
+            ==
+
+        ++  render-wallet-error
+          |=  [req=(pair @ta inbound-request:eyre) our=@p error-msg=tape]
+          ^-  (list card)
+          ::  Return JSON error response for AJAX
+          =/  body
+            %-  as-octs:mimes:html
+            %-  en:json:html
+            :-  %o
+            %-  my
+            :~  ['success' b+%.n]
+                ['error' s+(crip error-msg)]
+            ==
+          
+          =/  =response-header:http
+            :-  200
+            :~  ['Content-Type' 'application/json; charset=utf-8']
+            ==
+          
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ++  render-pay-transfer-with-wallets
+          |=  [req=(pair @ta inbound-request:eyre) our=@p recipient-ship=tape wallets=(list [addr sigm])]
+          ^-  (list card)
+          
+          ::  Check if wallets list is empty
+          ?~  wallets
+            =/  body
+              %-  as-octs:mimes:html
+              %-  en:json:html
+              :-  %o
+              %-  my
+              :~  ['success' b+%.n]
+                  ['error' s+'No wallets configured for transfers']
+                  ['recipient' s+(crip recipient-ship)]
+              ==
+            
+            =/  =response-header:http
+              :-  200
+              :~  ['Content-Type' 'application/json; charset=utf-8']
+              ==
+            
+            :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+                [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+                [%give %kick [/http-response/[p.req]]~ ~]
+            ==
+          
+          ::  Get first wallet and return it as JSON
+          =/  first-wallet  i.wallets
+          =/  wallet-addr  -.first-wallet
+          =/  wallet-address  (hextocord wallet-addr)
+          =/  wallet-nickname  (trip nickname.+.first-wallet)
+          
+          =/  body
+            %-  as-octs:mimes:html
+            %-  en:json:html
+            :-  %o
+            %-  my
+            :~  ['success' b+%.y]
+                ['recipient' s+(crip recipient-ship)]
+                ['wallet' s+wallet-address]
+                ['nickname' s+(crip wallet-nickname)]
+            ==
+          
+          =/  =response-header:http
+            :-  200
+            :~  ['Content-Type' 'application/json; charset=utf-8']
+            ==
+          
+          :~  [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+              [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+              [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+      ::
+      ++  handle-ship-transactions
+        |=  [req=(pair @ta inbound-request:eyre) our=@p now=@da current-state=_state]
+        ^-  [(list card) _current-state]
+        ::~&  [%handle-ship-transactions-called]
+        
+        :: Parse form data
+        =/  data=octs  +.body.request.q.req
+        =/  text-data  (crip (trip +.data))
+        =/  parsedata  (need (rush text-data yquy:de-purl:html))
+        ::~&  [%parsed-data parsedata]
+        
+        :: Extract fields helper
+        =/  get-field
+          |=  key=@t
+          ^-  (unit @t)
+          =/  result  (skim parsedata |=([k=@t v=@t] =(k key)))
+          ?~  result  ~
+          `+.i.result
+        
+        =/  recipient-cord  (get-field 'recipient')
+        ::~&  [%recipient-cord recipient-cord]
+        =/  amount-cord  (get-field 'amount')
+        ::~&  [%amount-cord amount-cord]
+        =/  amount-wei-cord  (get-field 'amountWei')
+       ::~&  [%amount-wei-cord amount-wei-cord]
+        =/  tx-hash-cord  (get-field 'txHash')
+        ::~&  [%tx-hash-cord tx-hash-cord]
+        =/  from-addr-cord  (get-field 'fromAddress')
+        ::~&  [%from-addr-cord from-addr-cord]
+        =/  to-addr-cord  (get-field 'toAddress')
+        ::~&  [%to-addr-cord to-addr-cord]
+        =/  memo-cord  (get-field 'payMemo')  :: NEW FIELD
+        ::~&  [%memo-cord memo-cord]
+        =/  currency-cord  (get-field 'currency')
+        ::~&  [%currency-cord currency-cord]
+        
+        :: Validate required fields
+        ?.  &(?=(^ recipient-cord) ?=(^ amount-cord) ?=(^ amount-wei-cord) ?=(^ tx-hash-cord))
+            :_  current-state
+            (give-simple-payload:app:server p.req [[400 ~] `(as-octs:mimes:html 'Missing required fields')])
+          
+        :: Parse recipient ship
+        =/  recipient-ship  (slaw %p u.recipient-cord)
+        ::~&  [%recipient-ship recipient-ship]
+        ?.  ?=(^ recipient-ship)
+          :_  current-state
+          (give-simple-payload:app:server p.req [[400 ~] `(as-octs:mimes:html 'Invalid ship name')])
+        
+        :: Parse tx hash
+        =/  tx-hash  (cordtohex u.tx-hash-cord)
+        ::~&  [%tx-hash tx-hash]
+        ?.  ?=(^ tx-hash)
+          :_  current-state
+          (give-simple-payload:app:server p.req [[400 ~] `(as-octs:mimes:html 'Invalid transaction hash')])
+         :: Check for duplicate tx hash
+        ?:  (~(has by transfer-history.current-state) u.tx-hash)
+        :_  current-state
+        (give-simple-payload:app:server p.req [[409 ~] `(as-octs:mimes:html 'Transaction already recorded')])
+         :: Parse amount in wei as @ud
+        
+        =/  amount-wei-parsed  (rush u.amount-wei-cord dem)
+        ::~&  [%amount-wei-parsed amount-wei-parsed]
+          ?.  ?=(^ amount-wei-parsed)
+            :_  current-state
+            (give-simple-payload:app:server p.req [[400 ~] `(as-octs:mimes:html 'Invalid amount in wei')])
+        :: Parse to-address (store as unit)
+        =/  to-addr=(unit @ux)
+          ?~  to-addr-cord
+            ~
+          (cordtohex u.to-addr-cord)
+        ::~&  [%to-addr to-addr]
+        
+        :: Parse from-address (store as unit)
+        =/  from-addr=(unit @ux)
+          ?~  from-addr-cord
+            :: Default: get first wallet from my-wallets
+            =/  wallet-list  ~(tap by my-wallets.current-state)
+            ?~(wallet-list ~ `-.i.wallet-list)
+          (cordtohex u.from-addr-cord)
+        ::~&  [%from-addr from-addr]
+        
+        :: Get memo with default empty string
+        =/  pay-memo  (fall memo-cord '')
+        =/  currency  (fall currency-cord 'ETH')
+        :: Create transfer record with NEW FIELDS
+        =/  transfer-rec=transfer-record
+          :*  from-addr=from-addr
+              from-ship=our
+              to-addr=to-addr
+              to-ship=u.recipient-ship
+              amount-eth=u.amount-cord         :: Changed from 'amount'
+              amount-wei=u.amount-wei-parsed   :: NEW field
+              when=now
+              pay-memo=pay-memo
+              currency=currency
+          ==
+        ::~&  [%transfer-rec transfer-rec]
+        
+        :: Add to transfer-history
+        =/  new-state  
+          current-state(transfer-history (~(put by transfer-history.current-state) u.tx-hash transfer-rec))
+        ::~&  [%updated-transfer-history (~(has by transfer-history.new-state) u.tx-hash)]
+        
+        :: Create poke card to send transfer to recipient ship
+        =/  transfer-data=xchange-transfer  [u.tx-hash transfer-rec]
+        =/  poke-card
+          [%pass /transfer-notify %agent [u.recipient-ship %xchange] %poke %xchange-transfer !>(transfer-data)]
+        ::~&  [%sending-poke-to u.recipient-ship]
+        
+        :_  new-state
+        ;:  welp
+          (give-simple-payload:app:server p.req [[200 ~] `(as-octs:mimes:html 'OK')])
+          ~[poke-card]
+        ==
+    ::
+    ++  make-eth-rpc-request
+        |=  [tx-hash=@ux request-id=@ta]
+        ^-  card
+        
+        :: Use public RPC endpoint (or your Infura/Alchemy key)
+        =/  rpc-url=@t  'https://ethereum-rpc.publicnode.com'
+        
+        :: Convert tx-hash to hex string format
+        =/  tx-hash-hex=@t  (hextocord tx-hash)
+        
+        :: Build JSON using the json library (already returns @t)
+        =/  json-body=@t
+          %-  en:json:html
+          %-  pairs:enjs:format
+          :~  ['jsonrpc' s+'2.0']
+              ['method' s+'eth_getTransactionByHash']
+              ['params' a+~[s+tx-hash-hex]]
+              ['id' (numb:enjs:format 1)]
+          ==
+        
+        =/  body-octs=octs  (as-octs:mimes:html json-body)
+        
+        =/  =request:http
+          :*  method=%'POST'
+              url=rpc-url
+              header-list=~[['Content-Type' 'application/json']]
+              body=(some body-octs)
+          ==
+        
+        :: Make the HTTP request via %iris - correct format
+        :*  %pass
+            /eth-verify/[request-id]
+            %arvo
+            %i
+            %request
+            request
+            *outbound-config:iris
+  ==
+    ::
+    ++  check-transaction-exists
+        |=  json=^json
+        ^-  ?
+        
+        :: Check if JSON is an object
+        ?.  ?=(%o -.json)
+          %.n
+        
+        :: Get the "result" field
+        =/  result  (~(get by p.json) 'result')
+        ?~  result
+          %.n
+        
+        :: If result is null (%n), transaction doesn't exist
+        :: If result is an object (%o), transaction exists
+        ?:  ?=(%n -.u.result)
+          %.n
+        
+        :: Transaction exists
+        %.y
+    ::
+     ++  get-transaction
+          |=  $:  req=(pair @ta inbound-request:eyre) 
+                  our=@p 
+                  eny=@t 
+                  my-wallets=(map addr sigm) 
+                  transfer-history=(map tx-hash=@ux transfer-record)
+                  unseen-tx=?
+                ==
+          ^-  (list card)
+          =/  body
+            %-  as-octs:mimes:html
+            %-  crip
+            %-  en-xml:html
+            ;html
+              ;head
+                ;title:"Xchange - Pay & Transfer"
+                ;link(rel "icon", type "image/x-icon", href "data:image/svg+xml,{favicon}");
+                ;meta(charset "utf-8");
+                ;meta(name "viewport", content "width=device-width, initial-scale=1");
+                ;style: {style}
+                ;script(type "module", src "/apps/xchange/js/xchange-wallet.js");
+                ;script(type "module", src "/apps/xchange/js/xchange-pay-transfer.js");
+              ==       
+              ;body
+                ;div(class "header-wrapper")
+                  ;img(src "/apps/xchange/img/xchange-logo.png", alt "Xchange Logo", class "header-logo");
+                  ;div.search-bar
+                    ;form(method "get", action "/apps/xchange/search", class "search-form")
+                      ;input(type "text", name "q", placeholder "Search ...", style "padding: 8px 40px 8px 12px; border: 1px solid #ccc; border-radius: 25px; font-size: 24px; width: 800px; outline: none;");
+                      ;button(type "submit", style "position: absolute; right: 12px; background: none; border: none; cursor: pointer; font-size: 18px; color: #666; padding: 4px; display: flex; align-items: center; justify-content: center;"): 🔍
+                    ==
+                  ==
+                  :: Wallet Connection Section
+                       ;div(class "wallet-section")
+                              ;div(class "wallet-connected-info")
+                              ;div(class "wallet-address"): 0x01 
+                              ;div(class "wallet-balance"): 0.00 ETH
+                            ==                     
+                          ;button(class "wallet-connect-btn"): Connect Wallet
+                          ;*  ?:  &(unseen-tx !=(transfer-history ~))
+                              ~[;span(class "nav-dot", title "New transaction");]
+                            ~
+                        ==
+                  ;div.ship-box                    
+                    ;a(href "/apps/xchange/settings", class "ship-name-link"): {(trip `@t`(scot %p our))}
+                    ;img(src "/apps/xchange/sigil?p={(trip `@t`(scot %p our))}&size=175", alt "Your Sigil", class "ship-sigil");                           
+                    ;a(href "/apps/xchange/settings", style "color: #666; margin-left: 16px; font-size: 48px; text-decoration: none;"): ⚙️                                               
+                  ==
+                ==
+                ;div.spacer
+                      ;br;
+                      ;br;
+                    ==::closes .spacer
+                     ;div.menu-bar
+                    ;ul
+                      ;li
+                        ;a(href "/apps/xchange"): All
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/type/services"): Services
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/type/events"): Events
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/type/jobs"): Jobs
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/type/for_sale"): For-Sale
+                      ==
+                    ==
+                  ==::closes menu-bar
+                ;div.spacer
+                  ;br;
+                  ;br;
+                ==
+                ::
+                ;div.main-content
+                  ;div.left-bar
+                    ;ul
+                      ;li
+                        ;a(href "/apps/xchange"): Home
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/alert"): Alerts
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/postad"): Post an Ad
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/myads"): My Ads
+                      == 
+                      ;li
+                        ;a(href "/apps/xchange/wallet"): Wallet
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/pay-transfer"): Pay & Transfer
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/pals"): Pals
+                      ==
+                      ;li
+                        ;a(href "/apps/xchange/subscriptions"): Subscriptions
+                      ==
+                    ==
+                  ==
+                  ::
+                  ;div.content-area
+                    
+                     ;div.table-wrapper
+                    ;+  ?:  =(transfer-history ~)
+                          ;div.table-div
+                            ;table
+                            ;tr
+                                ;td#title-row(colspan "7")
+                                    ;p: Transaction History
+                                ==
+                              ==
+                              ;tr
+                                ;th: Tx Hash
+                                ;th: Date
+                                ;th: From
+                                ;th: To
+                                ;th: Amount
+                                ;th: Currency
+                                ;th: Memo
+                              ==
+                              ;tr
+                                ;td#title-row(colspan "7")
+                                    ;p: No Transactions Found.
+                                ==
+                              ==
+                            ==
+                          ==
+                        =/  mytransaction-history  ~(tap by transfer-history)
+                            ;div.table-div
+                            ;table
+                                ;tr
+                                    ;td#title-row(colspan "7")
+                                        ;p: Transaction History
+                                    ==
+                                  ==
+                                ;tr
+                                  ;th: Tx Hash
+                                  ;th: Date
+                                  ;th: From
+                                  ;th: To
+                                  ;th: Amount
+                                  ;th: Currency
+                                  ;th: Memo
+                                ==
+                              ;*  %+  turn  mytransaction-history
+                                |=  [tx-hash=@ux rec=transfer-record]
+                                  =/  from-display  ?~(from-addr.rec "N/A" (trip (hextocord u.from-addr.rec)))
+                                  =/  to-display    ?~(to-addr.rec "N/A" (trip (hextocord u.to-addr.rec)))
+                                  =/  from-ship-display  (trip (scot %p from-ship.rec))
+                                  =/  to-ship-display  (trip (scot %p to-ship.rec))
+                                  ;tr
+                                    ;td(class "trans-history-cell"): {(trip (hextocord tx-hash))}
+                                    ;td(class "trans-history-cell"): {(trip (get-date when.rec))}
+                                   ;td(class "trans-history-cell")
+                                      ;div: {from-ship-display}
+                                      ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {from-display}
+                                    ==
+                                    ;td(class "trans-history-cell")
+                                      ;div: {to-ship-display}
+                                      ;div(style "font-size: 0.85em; color: #666; margin-top: 8px;"): {to-display}
+                                    ==
+                                    ;td(class "trans-history-cell"): {(trip amount-eth.rec)}
+                                    ;td(class "trans-history-cell"): {(trip currency.rec)}
+                                    ;td(class "trans-history-cell memo-cell")
+                                      ;form(method "post", action "/apps/xchange/update-memo")
+                                          ;input(type "hidden", name "tx-hash", value "{(trip (hextocord tx-hash))}");
+                                          ;input(type "text", name "memo", value "{(trip pay-memo.rec)}", style "min-width: 100px; overflow-wrap: break-word; word-wrap: break-word;");
+                                        ==:: closes memo form
+                                      ==:: closes memo cell
+                                    ==
+                                ==
+                            ==
+                        ==::  
+                      ==:: closes table-wrapper  
+                    ==  ::  closes main-content        
+                  ==  ::  closes body
+                ==  ::  closes html                                                    
+            ::
+          =/  =response-header:http
+            :-  200
+            :~  ['Content-Type' 'text/html; charset=utf-8']
+                ['Content-Security-Policy' 'default-src \'self\'; script-src \'self\' \'unsafe-inline\' \'unsafe-eval\' https://esm.sh https://cdn.esm.sh https://cdnjs.cloudflare.com; style-src \'self\' \'unsafe-inline\'; connect-src \'self\' https: wss:; img-src \'self\' data:;']
+            ==
+          :~
+            [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+            [%give %fact [/http-response/[p.req]]~ %http-response-data !>(`body)]
+            [%give %kick [/http-response/[p.req]]~ ~]
+          ==
+    ::
+          ++  update-memo-state
+        |=  [req=(pair @ta inbound-request:eyre) our=@p transfer-history=(map @ux transfer-record)]
+        =/  data=octs     +.body.request.q.req
+        =/  text-data     (crip (trip +.data))
+        =/  parsedata     (need (rush text-data yquy:de-purl:html))
+        =/  tx-hash-cord  (snag 0 parsedata)
+        =/  memo-cord     (snag 1 parsedata)
+        =/  maybe-tx-hash  (cordtohex `@t`+.tx-hash-cord)
+        ?~  maybe-tx-hash  state
+        =/  maybe-rec  (~(get by transfer-history) u.maybe-tx-hash)
+        ?~  maybe-rec  state
+        =/  updated-history
+          %+  ~(jab by transfer-history)
+          u.maybe-tx-hash
+          |=(rec=transfer-record rec(pay-memo `@t`+.memo-cord))
+        state(transfer-history updated-history)
+      ::
+      ++  post-transactions-webpage
+        |=  [req=(pair @ta inbound-request:eyre) our=@p]
+        ^-  (list card)
+        =/  =response-header:http
+          :-  301
+          :~  ['Location' '/apps/xchange/transactions']
+          ==
+        :~
+          [%give %fact [/http-response/[p.req]]~ %http-response-header !>(response-header)]
+          [%give %kick [/http-response/[p.req]]~ ~]
+        ==
+      ::
       ++  script
           ^~
           %-  trip
@@ -4984,6 +7241,14 @@
                   display: flex;
                   justify-content: center;
                 }
+                .content-area {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    padding: 20px;
+                    width: 100%;
+                  }
                 .header-wrapper {
                     display: flex;
                     flex-direction: row;
@@ -5106,6 +7371,38 @@
               display: flex;
               flex-direction: row;
             }
+            .wallet-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                padding: 40px;
+                margin: 0 auto;
+                max-width: 1200px;
+              }
+              .wallet-connect-btn {
+                padding: 15px 30px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 18px;
+                font-weight: bold;
+              }
+              .wallet-instruction {
+                margin-top: 15px;
+                color: #666;
+              }
+              .nav-dot {
+              display: inline-block;
+              width: 9px;
+              height: 9px;
+              background-color: #2196f3;
+              border-radius: 50%;
+              margin-left: 6px;
+              vertical-align: middle;
+            }
             .left-bar {
               display: flex;
               flex-direction: column;
@@ -5129,7 +7426,7 @@
 
               .left-bar li a {
                 text-decoration: none;
-                color: #333;
+                color: blue;  
                 display: block;
                 padding: 12px 16px;
                 border-radius: 4px;
@@ -5210,6 +7507,33 @@
               margin-bottom: 10px;
             }
             .view-button:hover {
+            background-color: #A9A9A9;
+            }
+             .send-metamask-button {
+              background-color: #333333;
+              color: white;
+              border: none;
+              font-size: 16px;
+              padding: 5px 10px;
+              border-radius: 4px;
+              cursor: pointer;
+              margin-top: 10px;
+              margin-bottom: 10px;
+            }
+            .send-metamask-button:hover {
+            background-color: #A9A9A9;
+            }
+            .lookup-wallet-button {
+              background-color: #333333;
+              color: white;
+              border: none;
+              font-size: 16px;
+              padding: 5px 10px;
+              border-radius: 4px;
+              cursor: pointer;
+              margin: 10px;
+            }
+            .lookup-wallet-button:hover {
             background-color: #A9A9A9;
             }
             .hide-button {
@@ -5361,12 +7685,58 @@
             table {
               width: 90%;
             }
+            .form-section {
+              font-size: 20px;
+              margin-bottom: 20px;
+              }
             .alert-table {
               width: 90%;
               margin: 1in 2in 1in 2in;
               table-layout: fixed; 
               overflow-x: auto; 
             }
+            .wallet-content {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              justify-content: flex-start;
+              padding: 40px;
+              margin: 0 auto;
+              max-width: 1200px;
+            }
+            .wallet-link-section {
+              margin-top: 30px;
+            }
+             .wallet-prompt {
+               margin-top: 30px;
+               } 
+            .wallet-link-btn {
+                padding: 12px 24px;
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+                height: 48px;
+                width: 200px;
+              }
+              .transactions-button {
+                  margin-top: 40px;
+                }
+              .transactions-btn {
+                padding: 12px 24px;
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+                height: 48px;
+                width: 200px;
+              }
             table, th, td {
               border: 1px solid #d0d0d0;
               border-collapse: collapse;
@@ -5400,15 +7770,13 @@
               white-space: normal;
             }
 
-            th:nth-child(1), td:nth-child(1) { width: 15%; }
+            th:nth-child(1), td:nth-child(1) { width: 20%; }
             th:nth-child(2), td:nth-child(2) { width: 10%; }
             th:nth-child(3), td:nth-child(3) { width: 8%; }
             th:nth-child(4), td:nth-child(4) { width: 8%; }
             th:nth-child(5), td:nth-child(5) { width: 8%; }
             th:nth-child(6), td:nth-child(6) { width: 12%; }
-            th:nth-child(7), td:nth-child(7) { width: 10%; } 
-            th:nth-child(8), td:nth-child(8) { width: 20%; }
-            th:nth-child(9), td:nth-child(9) { width: 9%; } 
+            th:nth-child(7), td:nth-child(7) { width: 40%; } 
 
             .hide-button {
               padding: 5px 10px;
@@ -5435,7 +7803,6 @@
             #available-red {
               background-color: #ffdddb;
             }
-
             .post-ad-button, .search-alert-button {
               padding: 8px 12px;
               border-radius: 4px;
@@ -5472,6 +7839,12 @@
               margin-left: 6px;
               margin-bottom: 10px;
             }
+             label2 {
+              font-size: 20px;
+              font-weight: 300;
+              margin-left: 6px;
+              margin-bottom: 10px;
+            }
             input {
               padding: 12px;
             }
@@ -5501,11 +7874,61 @@
             .input-error-visible {
               visibility: visible;
             }
+            .trans-history-header {
+              font-size: 24px;
+              font-weight: bold;
+              margin-bottom: 16px;
+            }
+            .trans-history-cell {
+              font-size: 18px;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              white-space: normal;
+            }
+            .trans-history-cell:first-child {
+              max-width: 120px;
+              word-break: break-all;
+              font-size: 16px;
+              color: #666;
+            }
+            .trans-history-cell input[type="text"] {
+              font-size: 16px;
+              border: none;
+              background: transparent;
+              width: 100%;
+              min-width: 80px;
+            }
+            .trans-history-cell input[type="text"]:focus {
+              outline: 1px solid #ccc;
+              border-radius: 3px;
+              background: #fff;
+            }
+            .memo-cell textarea {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                white-space: pre-wrap;
+                min-width: 100px;
+              }
+              .memo-cell textarea:focus {
+                outline: 1px solid #ccc;
+                border-radius: 3px;
+                background: #fff;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                white-space: pre-wrap;
+                min-width: 100px;
+              }
             #empty-row {
               text-align: center;
               vertical-align: middle;
               font-size: 18px;
               border-right-color: white;
+            }
+            #title-row {
+              text-align: center;
+              vertical-align: middle;
+              font-weight: bold;
+              font-size: 22px;
             }
             #submit-button {
               padding: 12px;
@@ -5766,6 +8189,143 @@
                 width: 70%;  /* Value column wider */
                 word-wrap: break-word;
               }
+              .metamask-transfer {
+                border: 2px solid #333;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px;
+                width: 25%;
+                }
+                .wallet-header {
+                    display: flex;
+                    flex-direction: row;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                  }
+            .wallet-layout {
+                display: flex;
+                gap: 20px;
+                flex: 1;
+                padding: 20px;
+              }
+
+              .wallet-content {
+                flex: 2;
+              }
+
+              .linked-wallets-card {
+                flex: 1;
+                background: white;
+                padding: 30px;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-left: -25%;
+              }
+              .unlink-button {
+                    padding: 8px 16px;
+                    padding: 5px;
+                    background-color: #0000FF;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-size: 16px;
+                  }
+
+                  .unlink-button:hover {
+                    background-color: #0000FF;
+                  }
+                  .toggle-transfer-button {
+                      padding: 5px;
+                      background-color: #0000FF;
+                      color: white;
+                      border: none;
+                      border-radius: 3px;
+                      cursor: pointer;
+                      font-size: 16px;
+                      margin-left: 5px;
+                    }
+
+                    .toggle-transfer-button:hover {
+                      background: l#ef9a9a;
+                    }
+                    .toggle-transfer-button-open {
+                      padding: 5px;
+                      background-color: #4CAF50;  
+                      color: white;
+                      border: none;
+                      border-radius: 3px;
+                      cursor: pointer;
+                      font-size: 16px;
+                      margin-left: 5px;
+                    }
+
+                    .toggle-transfer-button-open:hover {
+                      background: #a5d6a7;
+                    }
+                    .wallet-section {
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;f
+                        margin-right: 20px;
+                        width: auto;
+                        min-width: 250px;
+                        position: relative;
+                      }
+
+                      .wallet-connected-info {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;     /* Vertically center */
+                        gap: 12px;  
+                        padding: 8px 16px;
+                        background-color: #f0f0f0;
+                        border-radius: 8px;
+                        font-size: 16px;
+                      }
+
+                      .wallet-status {
+                        font-weight: bold;
+                        color: #2c3e50;
+                        font-family: 'Monaco', 'Courier New', monospace;
+                        font-size: 16px;
+                        margin-bottom: 4px;
+                      }
+
+                      .wallet-balance {
+                        color: #27ae60;
+                        font-weight: 600;
+                        font-size: 16px;
+                        font-family: 'Monaco', 'Courier New', monospace;
+                      }
+
+                      .wallet-address {
+                        font-family: 'Monaco', 'Courier New', monospace;
+                        font-size: 16px;
+                        color: #27ae60;
+                      }
+
+                      .wallet-connect-btn {
+                        display: none;
+                        padding: 10px 20px;
+                        background-color: #4CAF50;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 16px;
+                        font-weight: bold;
+                        transition: background-color 0.2s;
+                      }
+
+                      .wallet-connect-btn:hover {
+                        background-color: #45a049;
+                      }
+
+                      .wallet-connect-btn:disabled {
+                        background-color: #cccccc;
+                        cursor: not-allowed;
+                      }
 
             /* Mobile landscape (740x360) and portrait (360x740) */
             @media (max-width: 768px) {
@@ -5902,8 +8462,7 @@
               .pals-wrapper td {
                 padding: 6px 4px !important;
                 font-size: 14px !important;
-              }
-              
+              }  
               .pals-wrapper th[colspan] {
                 font-size: 16px !important;
                 padding: 8px !important;
@@ -6088,6 +8647,7 @@
                 width: 100%;
                 min-height: auto;
                 padding: 10px 0;
+                color: blue;
               }
               
               .left-bar ul {
@@ -6100,11 +8660,16 @@
               
               .left-bar li {
                 font-size: 14px;
+                cursor: pointer;
               }
               
               .left-bar li a {
                 padding: 6px 10px;
               }
+              .left-bar li:hover {
+              text-decoration: underline;
+              color: blue;
+            }
               
               /* Make tables more compact */
               .pals-wrapper th,
@@ -6129,6 +8694,9 @@
               }
               .main-content {
                 flex-direction: column;
+              }
+              .main-content-row {
+                flex-direction: row;
               }
               .alert-wrapper {
                   width: 100%;  
@@ -6199,45 +8767,38 @@
                 padding: 10px;
                 margin: 0;
               }
-              
               .subscription-column {
                 max-width: 95%;  /* Smaller width for mobile */
                 width: 100%;
                 padding: 0;  /* Remove extra padding */
               }
-              
               .subscription-table-wrapper {
                 max-width: 100%;  /* Allow full width of column */
                 padding: 15px;  /* Reduce padding */
               }
-              
               .subscription-table {
                 width: 100%;  /* Use full available width */
                 font-size: 0.75rem;  /* Smaller text */
               }
-              
               .subscription-header-main {
                 font-size: 1.25rem;  /* Smaller header */
               }
-              
               .subscription-header-sub {
                 font-size: 0.875rem;
               }
-              
               .subscription-th {
                 font-size: 1rem;
                 padding: 6px;
               }
-              
               .subscription-td {
                 font-size: 0.875rem;
                 padding: 6px;
-              }
-              
+              }       
               .subscription-empty {
                 font-size: 1rem;
                 padding: 15px;
               }
+
             '''
             ::
             ::
