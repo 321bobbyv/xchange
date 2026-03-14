@@ -21,6 +21,7 @@ Milestone 1 - Done
 7.	Memory management for the app/desk to not crash the ship
 8.	Alerts for ads that match user criteria
 9.	Pals integration with reputation.
+
 Milestone 2
 10.	Attach your metamask wallet- using fund integration – (use fund integration as guide)
 11.	Attach other crypto wallets - possible nockchain integration.
